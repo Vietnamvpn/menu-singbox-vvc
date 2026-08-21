@@ -34,7 +34,7 @@ show_node_menu() {
     while true; do
         clear
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${BLUE}||                    QUẢN LÝ NODE & ROUTING                  ||${NC}"
+        echo -e "${BLUE}||${NC}                    ${YELLOW}QUẢN LÝ NODE & ROUTING${NC}                  ${BLUE}||${NC}"
         echo -e "${BLUE}================================================================${NC}"
         echo -e "${GREEN} 1.${NC} Hiển Thị & Quản Lý Node"
         echo -e "${GREEN} 2.${NC} Thêm Node"
