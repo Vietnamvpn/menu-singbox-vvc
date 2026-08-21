@@ -103,16 +103,11 @@ show_node_menu() {
 show_menu() {
     clear
     show_banner
-    echo -e "${GREEN} 1.${NC} Quản Lý Node & Routing"
-    echo -e "${GREEN} 2.${NC} Quản Lý Người dùng"
-    echo -e "${GREEN} 3.${NC} Quản Lý Chứng Chỉ SSL"
-    echo -e "${GREEN} 4.${NC} Quản Lý Sing Box Core"
-    echo -e "${GREEN} 5.${NC} API Web Trung Tâm"
-    echo -e "${GREEN} 6.${NC} Kích hoạt TCP BBR"
-    echo -e "${GREEN} 7.${NC} Thêm Bộ Nhớ Swap"
-    echo -e "${GREEN} 8.${NC} Cập Nhật Hệ Thống"
-    echo -e "${GREEN} 9.${NC} Gỡ Bỏ Hoàn Toàn Hệ Thống"
-    echo -e "${RED} 0.${NC} Thoát"
+    printf " ${GREEN}%-3s${NC} %-26s ${GREEN}%-3s${NC} %-26s\n" "1." "Quản Lý Node & Routing" "2." "Quản Lý Người dùng"
+    printf " ${GREEN}%-3s${NC} %-26s ${GREEN}%-3s${NC} %-26s\n" "3." "Quản Lý Chứng Chỉ SSL" "4." "Quản Lý Sing Box Core"
+    printf " ${GREEN}%-3s${NC} %-26s ${GREEN}%-3s${NC} %-26s\n" "5." "API Web Trung Tâm" "6." "Kích hoạt TCP BBR"
+    printf " ${GREEN}%-3s${NC} %-26s ${GREEN}%-3s${NC} %-26s\n" "7." "Thêm Bộ Nhớ Swap" "8." "Cập Nhật Hệ Thống"
+    printf " ${GREEN}%-3s${NC} %-26s ${RED}%-3s${NC} %-26s\n" "9." "Gỡ Bỏ Hoàn Toàn" "0." "Thoát"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn một chức năng [0-9]: " choice
 
@@ -196,8 +191,10 @@ show_menu() {
             ;;
     esac
 }
-
 # Vòng lặp chính
+
 while true; do
+
     show_menu
-done
+
+done 
