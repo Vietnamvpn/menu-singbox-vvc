@@ -25,7 +25,7 @@ show_banner() {
     echo -e "${BLUE}||                  MENU QUẢN LÝ SING BOX                     ||${NC}"
     echo -e ""
     echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR | ${YELLOW}Website:${NC} $WEBSITE" 
-    echo -e " ${YELLOW}Core Ver:${NC} $(get_singbox_version)  | ${YELLOW}Trạng thái:${NC} $(get_singbox_status) | ${YELLOW}Phiên bản:${NC} $VERSION"
+    echo -e " ${YELLOW}Core Ver:${NC} $(get_singbox_version) | ${YELLOW}Trạng thái:${NC} $(get_singbox_status) | ${YELLOW}Phiên bản:${NC} $VERSION"
     echo -e "${BLUE}================================================================${NC}"
 }
 
@@ -103,11 +103,11 @@ show_node_menu() {
 show_menu() {
     clear
     show_banner
-    echo -e " ${GREEN}1.${NC} Quản Lý Node & Routing   ${CYAN}│${NC} ${GREEN}2.${NC} Quản Lý Người Dùng"
-    echo -e " ${GREEN}3.${NC} Quản Lý Chứng Chỉ SSL    ${CYAN}│${NC} ${GREEN}4.${NC} Quản Lý Sing Box Core"
-    echo -e " ${GREEN}5.${NC} API Web Trung Tâm        ${CYAN}│${NC} ${GREEN}6.${NC} Kích Hoạt TCP BBR"
-    echo -e " ${GREEN}7.${NC} Thêm Bộ Nhớ Swap         ${CYAN}│${NC} ${GREEN}8.${NC} Cập Nhật Hệ Thống"
-    echo -e " ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn          ${CYAN}│${NC} ${RED}0.${NC} Thoát Khỏi Menu"
+    echo -e " ${GREEN}1.${NC} Quản Lý Node & Routing   ${CYAN}│${NC}  ${GREEN}2.${NC} Quản Lý Người Dùng"
+    echo -e " ${GREEN}3.${NC} Quản Lý Chứng Chỉ SSL    ${CYAN}│${NC}  ${GREEN}4.${NC} Quản Lý Sing Box Core"
+    echo -e " ${GREEN}5.${NC} API Web Trung Tâm        ${CYAN}│${NC}  ${GREEN}6.${NC} Kích Hoạt TCP BBR"
+    echo -e " ${GREEN}7.${NC} Thêm Bộ Nhớ Swap         ${CYAN}│${NC}  ${GREEN}8.${NC} Cập Nhật Hệ Thống"
+    echo -e " ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn          ${CYAN}│${NC}  ${RED}0.${NC} Thoát Khỏi Menu"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn một chức năng [0-9]: " choice
 
