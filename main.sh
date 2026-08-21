@@ -21,21 +21,21 @@ WEBSITE="https://linksub24h.com"
 # Hàm hiển thị Banner và Lời chào gọn gàng
 show_banner() {
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                    MENU QUẢN LÝ SING BOX                       ${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||                  MENU QUẢN LÝ SING BOX                     ||${NC}"
     echo -e ""
     echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR | ${YELLOW}Website:${NC} $WEBSITE" 
     echo -e " ${YELLOW}Core Ver:${NC} $(get_singbox_version)  | ${YELLOW}Trạng thái:${NC} $(get_singbox_status) | ${YELLOW}Phiên bản:${NC} $VERSION"
-    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}================================================================${NC}"
 }
 
 # Menu con: Quản lý Node (Chỉ hiện khi bấm vào Quản lý Node ở menu chính)
 show_node_menu() {
     while true; do
         clear
-        echo -e "${CYAN}================================================================${NC}"
-        echo -e "${BLUE}||                      QUẢN LÝ NODE & ROUTING                    ||${NC}"
-        echo -e "${CYAN}================================================================${NC}"
+        echo -e "${BLUE}================================================================${NC}"
+        echo -e "${BLUE}||                    QUẢN LÝ NODE & ROUTING                  ||${NC}"
+        echo -e "${BLUE}================================================================${NC}"
         echo -e "${GREEN} 1.${NC} Hiển Thị & Quản Lý Node"
         echo -e "${GREEN} 2.${NC} Thêm Node"
         echo -e "${GREEN} 3.${NC} Thêm Entry"
