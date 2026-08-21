@@ -103,11 +103,11 @@ show_node_menu() {
 show_menu() {
     clear
     show_banner
-    printf " ${GREEN}%-3s${NC} %-30s ${GREEN}%-3s${NC} %-30s\n" "1." "Quản Lý Node & Routing" "2." "Quản Lý Người dùng"
-    printf " ${GREEN}%-3s${NC} %-30s ${GREEN}%-3s${NC} %-30s\n" "3." "Quản Lý Chứng Chỉ SSL" "4." "Quản Lý Sing Box Core"
-    printf " ${GREEN}%-3s${NC} %-30s ${GREEN}%-3s${NC} %-30s\n" "5." "API Web Trung Tâm" "6." "Kích hoạt TCP BBR"
-    printf " ${GREEN}%-3s${NC} %-30s ${GREEN}%-3s${NC} %-30s\n" "7." "Thêm Bộ Nhớ Swap" "8." "Cập Nhật Hệ Thống"
-    printf " ${GREEN}%-3s${NC} %-30s ${RED}%-3s${NC} %-30s\n" "9." "Gỡ Bỏ Hoàn Toàn" "0." "Thoát"
+    printf " ${GREEN}%-2s${NC} %-25s ${CYAN}│${NC} ${GREEN}%-2s${NC} %-25s\n" "1." "Quản Lý Node & Routing" "2." "Quản Lý Người dùng"
+    printf " ${GREEN}%-2s${NC} %-25s ${CYAN}│${NC} ${GREEN}%-2s${NC} %-25s\n" "3." "Quản Lý Chứng Chỉ SSL" "4." "Quản Lý Sing Box Core"
+    printf " ${GREEN}%-2s${NC} %-25s ${CYAN}│${NC} ${GREEN}%-2s${NC} %-25s\n" "5." "API Web Trung Tâm" "6." "Kích hoạt TCP BBR"
+    printf " ${GREEN}%-2s${NC} %-25s ${CYAN}│${NC} ${GREEN}%-2s${NC} %-25s\n" "7." "Thêm Bộ Nhớ Swap" "8." "Cập Nhật Hệ Thống"
+    printf " ${GREEN}%-2s${NC} %-25s ${CYAN}│${NC} ${RED}%-2s${NC} %-25s\n" "9." "Gỡ Bỏ Hoàn Toàn" "0." "Thoát"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn một chức năng [0-9]: " choice
 
