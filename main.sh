@@ -34,7 +34,7 @@ show_node_menu() {
     while true; do
         clear
         echo -e "${CYAN}================================================================${NC}"
-        echo -e "${BLUE}                      QUẢN LÝ NODE & ROUTING                    ${NC}"
+        echo -e "${BLUE}||                      QUẢN LÝ NODE & ROUTING                    ||${NC}"
         echo -e "${CYAN}================================================================${NC}"
         echo -e "${GREEN} 1.${NC} Hiển Thị & Quản Lý Node"
         echo -e "${GREEN} 2.${NC} Thêm Node"
@@ -103,11 +103,11 @@ show_node_menu() {
 show_menu() {
     clear
     show_banner
-    echo -e " ${GREEN}1. Quản Lý Node & Routing   ${CYAN}│${NC} ${GREEN}2. Quản Lý Người dùng       ${NC}"
-    echo -e " ${GREEN}3. Quản Lý Chứng Chỉ SSL    ${CYAN}│${NC} ${GREEN}4. Quản Lý Sing Box Core    ${NC}"
-    echo -e " ${GREEN}5. API Web Trung Tâm        ${CYAN}│${NC} ${GREEN}6. Kích hoạt TCP BBR        ${NC}"
-    echo -e " ${GREEN}7. Thêm Bộ Nhớ Swap         ${CYAN}│${NC} ${GREEN}8. Cập Nhật Hệ Thống        ${NC}"
-    echo -e " ${GREEN}9. Gỡ Bỏ Hoàn Toàn          ${CYAN}│${NC} ${RED}0. Thoát                    ${NC}"
+    echo -e " ${GREEN}1.${NC} Quản Lý Node & Routing   ${CYAN}│${NC} ${GREEN}2.${NC} Quản Lý Người Dùng"
+    echo -e " ${GREEN}3.${NC} Quản Lý Chứng Chỉ SSL    ${CYAN}│${NC} ${GREEN}4.${NC} Quản Lý Sing Box Core"
+    echo -e " ${GREEN}5.${NC} API Web Trung Tâm        ${CYAN}│${NC} ${GREEN}6.${NC} Kích Hoạt TCP BBR"
+    echo -e " ${GREEN}7.${NC} Thêm Bộ Nhớ Swap         ${CYAN}│${NC} ${GREEN}8.${NC} Cập Nhật Hệ Thống"
+    echo -e " ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn          ${CYAN}│${NC} ${RED}0.${NC} Thoát Khỏi Menu"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn một chức năng [0-9]: " choice
 
