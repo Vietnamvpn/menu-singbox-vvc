@@ -1,0 +1,14 @@
+[Unit]
+Description=Sing-box Manager API Server
+After=network.target sing-box.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/menu-singbox-vvc
+ExecStart=/opt/menu-singbox-vvc/core/api_server
+Restart=always
+RestartSec=5s
+User=root
+
+[Install]
+WantedBy=multi-user.target
