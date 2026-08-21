@@ -22,11 +22,11 @@ WEBSITE="https://linksub24h.com"
 show_banner() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${PURPLE}                    MENU-SINGBOX-VVC                          ${NC}"
-    echo -e "${YELLOW}                 Phiên bản:${NC} $VERSION" 
+    echo -e "${BLUE}                    MENU-SINGBOX-VVC                          ${NC}"
+    echo -e "${YELLOW}                    Phiên bản:${NC} $VERSION" 
     echo -e "${CYAN}================================================================${NC}"
     echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR | ${YELLOW}Website:${NC} $WEBSITE" 
-    echo -e " ${YELLOW}Core Ver:${NC}  $(get_singbox_version) | ${YELLOW}Trạng thái:${NC}  $(get_singbox_status)"
+    echo -e " ${YELLOW}Core Ver:${NC}  $(get_singbox_version)  | ${YELLOW}Trạng thái:${NC}  $(get_singbox_status)"
     echo -e "${CYAN}================================================================${NC}"
 }
 
@@ -35,14 +35,14 @@ show_node_menu() {
     while true; do
         clear
         echo -e "${CYAN}================================================================${NC}"
-        echo -e "${PURPLE}                      QUẢN LÝ NODE & ROUTING                    ${NC}"
+        echo -e "${BLUE}                      QUẢN LÝ NODE & ROUTING                    ${NC}"
         echo -e "${CYAN}================================================================${NC}"
-        echo -e "${GREEN} 1.${NC} Hiển thị & Quản lý Node"
+        echo -e "${GREEN} 1.${NC} Hiển Thị & Quản Lý Node"
         echo -e "${GREEN} 2.${NC} Thêm Node"
         echo -e "${GREEN} 3.${NC} Thêm Entry"
         echo -e "${GREEN} 4.${NC} Thêm Outbound"
         echo -e "${GREEN} 5.${NC} Thêm Routing"
-        echo -e "${GREEN} 0.${NC} Quay lại Menu Chính"
+        echo -e "${RED} 0.${NC} Quay Lại Menu Chính"
         echo -e "${CYAN}================================================================${NC}"
         read -p " Vui lòng chọn chức năng [0-5]: " sub_choice
 
@@ -104,16 +104,16 @@ show_node_menu() {
 show_menu() {
     clear
     show_banner
-    echo -e "${GREEN} 1.${NC} Quản lý Node"
-    echo -e "${GREEN} 2.${NC} Quản lý Người dùng (Users)"
-    echo -e "${GREEN} 3.${NC} Quản lý Chứng chỉ SSL"
-    echo -e "${GREEN} 4.${NC} Quản lý Hệ thống & Service (System)"
-    echo -e "${GREEN} 5.${NC} API Web Trung tâm"
+    echo -e "${GREEN} 1.${NC} Quản Lý Node & Routing"
+    echo -e "${GREEN} 2.${NC} Quản Lý Người dùng"
+    echo -e "${GREEN} 3.${NC} Quản Lý Chứng Chỉ SSL"
+    echo -e "${GREEN} 4.${NC} Quản Lý Sing Box Core"
+    echo -e "${GREEN} 5.${NC} API Web Trung Tâm"
     echo -e "${GREEN} 6.${NC} Kích hoạt TCP BBR"
-    echo -e "${GREEN} 7.${NC} Thêm bộ nhớ Swap"
-    echo -e "${GREEN} 8.${NC} Cập nhật hệ thống (Update Script)"
-    echo -e "${GREEN} 9.${NC} Gỡ bỏ hoàn toàn hệ thống (Uninstall)"
-    echo -e "${GREEN} 0.${NC} Thoát"
+    echo -e "${GREEN} 7.${NC} Thêm Bộ Nhớ Swap"
+    echo -e "${GREEN} 8.${NC} Cập Nhật Hệ Thống"
+    echo -e "${GREEN} 9.${NC} Gỡ Bỏ Hoàn Toàn Hệ Thống"
+    echo -e "${RED} 0.${NC} Thoát"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn một chức năng [0-9]: " choice
 
