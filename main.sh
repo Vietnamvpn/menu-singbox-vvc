@@ -22,7 +22,7 @@ WEBSITE="https://linksub24h.com"
 show_banner() {
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||                  MENU QUẢN LÝ SING BOX                     ||${NC}"
+    echo -e "${BLUE}||${NC}                  ${YELLOW}MENU QUẢN LÝ SING BOX${NC}                     ${BLUE}||${NC}"
     echo -e ""
     echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR | ${YELLOW}Website:${NC} $WEBSITE" 
     echo -e " ${YELLOW}Core Ver:${NC} $(get_singbox_version) | ${YELLOW}Trạng thái:${NC} $(get_singbox_status) | ${YELLOW}Phiên bản:${NC} $VERSION"
