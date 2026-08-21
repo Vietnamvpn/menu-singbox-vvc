@@ -16,17 +16,17 @@ fi
 
 VERSION="v1.0.0"
 AUTHOR="Vietnamvpn"
-WEBSITE="https://github.com/Vietnamvpn"
+WEBSITE="https://linksub24h.com"
 
 # Hàm hiển thị Banner và Lời chào gọn gàng
 show_banner() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${PURPLE}                 SING-BOX VVC MANAGEMENT                        ${NC}"
+    echo -e "${PURPLE}                    MENU-SINGBOX-VVC                          ${NC}"
+    echo -e "${YELLOW}                 Phiên bản:${NC} $VERSION" 
     echo -e "${CYAN}================================================================${NC}"
-    echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR       | ${YELLOW}Phiên bản:${NC} $VERSION"
-    echo -e " ${YELLOW}Website:${NC} $WEBSITE"
-    echo -e " ${YELLOW}Core Ver:${NC}  $(get_singbox_version)   | ${YELLOW}Trạng thái:${NC}  $(get_singbox_status)"
+    echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR | ${YELLOW}Website:${NC} $WEBSITE" 
+    echo -e " ${YELLOW}Core Ver:${NC}  $(get_singbox_version) | ${YELLOW}Trạng thái:${NC}  $(get_singbox_status)"
     echo -e "${CYAN}================================================================${NC}"
 }
 
