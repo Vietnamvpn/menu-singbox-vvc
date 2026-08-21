@@ -309,6 +309,12 @@ form_hy2() {
     ask_port
     ask_domain
     
+    read -p " Nhập Password [Để trống = tự tạo ngẫu nhiên]: " password
+    if [ -z "$password" ]; then
+        password=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
+        echo -e "${GREEN} -> Đã tạo Password ngẫu nhiên: $password${NC}"
+    fi
+    
     read -p " Nhập tốc độ Upload (UP_MBPS) [Để trống = mặc định 100]: " up_mbps
     up_mbps="${up_mbps:-100}"
     
@@ -328,6 +334,7 @@ form_hy2() {
        --arg type "hysteria2" \
        --argjson port "$ASKED_PORT" \
        --arg domain "$ASKED_DOMAIN" \
+       --arg password "$password" \
        --arg up_mbps "$up_mbps" \
        --arg down_mbps "$down_mbps" \
        --arg cert_path "$cert_path" \
@@ -337,6 +344,7 @@ form_hy2() {
            "type": $type,
            "port": $port,
            "domain": $domain,
+           "password": $password,
            "up_mbps": $up_mbps,
            "down_mbps": $down_mbps,
            "cert_path": $cert_path,
@@ -356,6 +364,22 @@ form_tuic() {
 
     ask_port
     ask_domain
+    
+    read -p " Nhập UUID [Để trống = tự tạo ngẫu nhiên]: " uuid
+    if [ -z "$uuid" ]; then
+        if command -v uuidgen >/dev/null 2>&1; then
+            uuid=$(uuidgen)
+        else
+            uuid=$(cat /proc/sys/kernel/random/uuid)
+        fi
+        echo -e "${GREEN} -> Đã tạo UUID ngẫu nhiên: $uuid${NC}"
+    fi
+
+    read -p " Nhập Password [Để trống = tự tạo ngẫu nhiên]: " password
+    if [ -z "$password" ]; then
+        password=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
+        echo -e "${GREEN} -> Đã tạo Password ngẫu nhiên: $password${NC}"
+    fi
 
     read -p " Nhập đường dẫn Certificate [Để trống = mặc định]: " cert_path
     cert_path="${cert_path:-$INSTALL_DIR/certs/$ASKED_DOMAIN/cert.pem}"
@@ -370,6 +394,8 @@ form_tuic() {
        --arg type "tuic" \
        --argjson port "$ASKED_PORT" \
        --arg domain "$ASKED_DOMAIN" \
+       --arg uuid "$uuid" \
+       --arg password "$password" \
        --arg cert_path "$cert_path" \
        --arg key_path "$key_path" \
        '. += [{
@@ -377,6 +403,8 @@ form_tuic() {
            "type": $type,
            "port": $port,
            "domain": $domain,
+           "uuid": $uuid,
+           "password": $password,
            "cert_path": $cert_path,
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
