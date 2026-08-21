@@ -61,9 +61,9 @@ check_root() {
 # Kiểm tra trạng thái hoạt động của Sing-box core[cite: 3]
 get_singbox_status() {
     if systemctl is-active --quiet sing-box; then
-        echo -e "${GREEN}Đang hoạt động (Running)${NC}"
+        echo -e "${GREEN}Đang Chạy${NC}"
     else
-        echo -e "${RED}Đã dừng (Stopped)${NC}"
+        echo -e "${RED}Đang dừng${NC}"
     fi
 }
 

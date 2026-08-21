@@ -24,9 +24,9 @@ show_banner() {
     echo -e "${CYAN}================================================================${NC}"
     echo -e "${PURPLE}                 SING-BOX VVC MANAGEMENT                        ${NC}"
     echo -e "${CYAN}================================================================${NC}"
-    echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR       | ${YELLOW}Phiên bản Script:${NC} $VERSION"
-    echo -e " ${YELLOW}Website/Git:${NC} $WEBSITE"
-    echo -e " ${YELLOW}Core Ver:${NC}  $(get_singbox_version)   | ${YELLOW}Trạng thái Core:${NC}  $(get_singbox_status)"
+    echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR       | ${YELLOW}Phiên bản:${NC} $VERSION"
+    echo -e " ${YELLOW}Website:${NC} $WEBSITE"
+    echo -e " ${YELLOW}Core Ver:${NC}  $(get_singbox_version)   | ${YELLOW}Trạng thái:${NC}  $(get_singbox_status)"
     echo -e "${CYAN}================================================================${NC}"
 }
 
