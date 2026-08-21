@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # ==========================================
-# modules/utils.sh - Các hàm tiện ích dùng chung[cite: 3]
+# modules/utils.sh - Các hàm tiện ích dùng chung
 # ==========================================
 
-# Định nghĩa màu sắc cho hiển thị CLI[cite: 3]
+# Định nghĩa màu sắc cho hiển thị CLI
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -13,17 +13,17 @@ CYAN='\033[0;36m'
 PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-INSTALL_DIR="/opt/menu-singbox-vvc"[cite: 3]
+INSTALL_DIR="/opt/menu-singbox-vvc"
 
-# Đường dẫn file log hệ thống[cite: 3]
-LOG_DIR="${INSTALL_DIR}/logs"[cite: 3]
-LOG_FILE="${LOG_DIR}/system.log"[cite: 3]
+# Đường dẫn file log hệ thống
+LOG_DIR="${INSTALL_DIR}/logs"
+LOG_FILE="${LOG_DIR}/system.log"
 
-# Đảm bảo thư mục log tồn tại[cite: 3]
-mkdir -p "$LOG_DIR"[cite: 3]
+# Đảm bảo thư mục log tồn tại
+mkdir -p "$LOG_DIR"
 
 # ==========================================
-# CÁC HÀM GHI LOG[cite: 3]
+# CÁC HÀM GHI LOG
 # ==========================================
 
 log_info() {
@@ -48,17 +48,17 @@ log_error() {
 }
 
 # ==========================================
-# CÁC HÀM HỆ THỐNG VÀ KIỂM TRA CORE[cite: 3]
+# CÁC HÀM HỆ THỐNG VÀ KIỂM TRA CORE
 # ==========================================
 
-# Kiểm tra quyền root[cite: 3]
+# Kiểm tra quyền root
 check_root() {
     if [[ $EUID -ne 0 ]]; then
        log_error "Script này phải được chạy với quyền root (sudo)!"
     fi
 }
 
-# Kiểm tra trạng thái hoạt động của Sing-box core[cite: 3]
+# Kiểm tra trạng thái hoạt động của Sing-box core
 get_singbox_status() {
     if systemctl is-active --quiet sing-box; then
         echo -e "${GREEN}Đang Chạy${NC}"
@@ -67,7 +67,7 @@ get_singbox_status() {
     fi
 }
 
-# Lấy phiên bản Sing-box core[cite: 3]
+# Lấy phiên bản Sing-box core
 get_singbox_version() {
     if command -v sing-box >/dev/null 2>&1; then
         local ver
@@ -83,10 +83,10 @@ get_singbox_version() {
 }
 
 # ==========================================
-# CÁC HÀM ĐIỀU KHIỂN VÀ CẬP NHẬT SING-BOX CORE[cite: 3]
+# CÁC HÀM ĐIỀU KHIỂN VÀ CẬP NHẬT SING-BOX CORE
 # ==========================================
 
-# Khởi động dịch vụ Sing-box[cite: 3]
+# Khởi động dịch vụ Sing-box
 start_singbox() {
     log_info "Đang khởi động Sing-box..."
     systemctl start sing-box
@@ -97,14 +97,14 @@ start_singbox() {
     fi
 }
 
-# Dừng dịch vụ Sing-box[cite: 3]
+# Dừng dịch vụ Sing-box
 stop_singbox() {
     log_info "Đang dừng Sing-box..."
     systemctl stop sing-box
     log_success "Đã dừng Sing-box."
 }
 
-# Khởi động lại dịch vụ Sing-box[cite: 3]
+# Khởi động lại dịch vụ Sing-box
 restart_singbox() {
     log_info "Đang khởi động lại Sing-box..."
     systemctl restart sing-box
@@ -115,11 +115,11 @@ restart_singbox() {
     fi
 }
 
-# Tự động cập nhật Sing-box Core mới nhất từ GitHub[cite: 3]
+# Tự động cập nhật Sing-box Core mới nhất từ GitHub
 update_singbox_core() {
     log_info "Đang kiểm tra và cập nhật Sing-box Core phiên bản mới nhất..."
     
-    # Kiểm tra kiến trúc hệ thống[cite: 3]
+    # Kiểm tra kiến trúc hệ thống
     local arch
     arch=$(uname -m)
     case "$arch" in
@@ -296,20 +296,20 @@ add_swap() {
 }
 
 # ==========================================
-# CÁC HÀM XỬ LÝ MẠNG VÀ PORT[cite: 3]
+# CÁC HÀM XỬ LÝ MẠNG VÀ PORT
 # ==========================================
 
-# Kiểm tra port đã được sử dụng chưa bằng netcat (nc)[cite: 3]
+# Kiểm tra port đã được sử dụng chưa bằng netcat (nc)
 check_port_in_use() {
     local port=$1
     if nc -z 127.0.0.1 "$port" >/dev/null 2>&1; then
-        return 0 # Port đang được sử dụng[cite: 3]
+        return 0 # Port đang được sử dụng
     else
-        return 1 # Port chưa được sử dụng (an toàn để dùng)[cite: 3]
+        return 1 # Port chưa được sử dụng (an toàn để dùng)
     fi
 }
 
-# Sinh port ngẫu nhiên chưa được sử dụng (từ 2000 đến 6000)[cite: 3]
+# Sinh port ngẫu nhiên chưa được sử dụng (từ 2000 đến 6000)
 get_random_unused_port() {
     local port
     while true; do
@@ -322,10 +322,10 @@ get_random_unused_port() {
 }
 
 # ==========================================
-# CÁC HÀM XỬ LÝ JSON BẰNG JQ[cite: 3]
+# CÁC HÀM XỬ LÝ JSON BẰNG JQ
 # ==========================================
 
-# Đọc giá trị từ file JSON[cite: 3]
+# Đọc giá trị từ file JSON
 read_json_value() {
     local file=$1
     local path=$2
@@ -336,7 +336,7 @@ read_json_value() {
     fi
 }
 
-# Sửa hoặc thêm giá trị (chuỗi) vào file JSON[cite: 3]
+# Sửa hoặc thêm giá trị (chuỗi) vào file JSON
 write_json_string() {
     local file=$1
     local path=$2
@@ -348,7 +348,7 @@ write_json_string() {
     fi
 }
 
-# Sửa hoặc thêm giá trị (số/boolean) vào file JSON[cite: 3]
+# Sửa hoặc thêm giá trị (số/boolean) vào file JSON
 write_json_raw() {
     local file=$1
     local path=$2
@@ -360,7 +360,7 @@ write_json_raw() {
     fi
 }
 
-# Trích xuất toàn bộ mảng hoặc object từ JSON để ghép nối[cite: 3]
+# Trích xuất toàn bộ mảng hoặc object từ JSON để ghép nối
 extract_json_block() {
     local file=$1
     local path=$2
