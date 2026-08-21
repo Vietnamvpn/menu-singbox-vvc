@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # ==========================================
-# modules/utils.sh - Các hàm tiện ích dùng chung
+# modules/utils.sh - Các hàm tiện ích dùng chung[cite: 3]
 # ==========================================
 
-# Định nghĩa màu sắc cho hiển thị CLI
+# Định nghĩa màu sắc cho hiển thị CLI[cite: 3]
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -13,17 +13,17 @@ CYAN='\033[0;36m'
 PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-INSTALL_DIR="/opt/menu-singbox-vvc"
+INSTALL_DIR="/opt/menu-singbox-vvc"[cite: 3]
 
-# Đường dẫn file log hệ thống
-LOG_DIR="${INSTALL_DIR}/logs"
-LOG_FILE="${LOG_DIR}/system.log"
+# Đường dẫn file log hệ thống[cite: 3]
+LOG_DIR="${INSTALL_DIR}/logs"[cite: 3]
+LOG_FILE="${LOG_DIR}/system.log"[cite: 3]
 
-# Đảm bảo thư mục log tồn tại
-mkdir -p "$LOG_DIR"
+# Đảm bảo thư mục log tồn tại[cite: 3]
+mkdir -p "$LOG_DIR"[cite: 3]
 
 # ==========================================
-# CÁC HÀM GHI LOG
+# CÁC HÀM GHI LOG[cite: 3]
 # ==========================================
 
 log_info() {
@@ -48,17 +48,17 @@ log_error() {
 }
 
 # ==========================================
-# CÁC HÀM HỆ THỐNG VÀ KIỂM TRA CORE
+# CÁC HÀM HỆ THỐNG VÀ KIỂM TRA CORE[cite: 3]
 # ==========================================
 
-# Kiểm tra quyền root
+# Kiểm tra quyền root[cite: 3]
 check_root() {
     if [[ $EUID -ne 0 ]]; then
        log_error "Script này phải được chạy với quyền root (sudo)!"
     fi
 }
 
-# Kiểm tra trạng thái hoạt động của Sing-box core
+# Kiểm tra trạng thái hoạt động của Sing-box core[cite: 3]
 get_singbox_status() {
     if systemctl is-active --quiet sing-box; then
         echo -e "${GREEN}Đang hoạt động (Running)${NC}"
@@ -67,7 +67,7 @@ get_singbox_status() {
     fi
 }
 
-# Lấy phiên bản Sing-box core
+# Lấy phiên bản Sing-box core[cite: 3]
 get_singbox_version() {
     if command -v sing-box >/dev/null 2>&1; then
         local ver
@@ -83,10 +83,10 @@ get_singbox_version() {
 }
 
 # ==========================================
-# CÁC HÀM ĐIỀU KHIỂN VÀ CẬP NHẬT SING-BOX CORE
+# CÁC HÀM ĐIỀU KHIỂN VÀ CẬP NHẬT SING-BOX CORE[cite: 3]
 # ==========================================
 
-# Khởi động dịch vụ Sing-box
+# Khởi động dịch vụ Sing-box[cite: 3]
 start_singbox() {
     log_info "Đang khởi động Sing-box..."
     systemctl start sing-box
@@ -97,14 +97,14 @@ start_singbox() {
     fi
 }
 
-# Dừng dịch vụ Sing-box
+# Dừng dịch vụ Sing-box[cite: 3]
 stop_singbox() {
     log_info "Đang dừng Sing-box..."
     systemctl stop sing-box
     log_success "Đã dừng Sing-box."
 }
 
-# Khởi động lại dịch vụ Sing-box
+# Khởi động lại dịch vụ Sing-box[cite: 3]
 restart_singbox() {
     log_info "Đang khởi động lại Sing-box..."
     systemctl restart sing-box
@@ -115,11 +115,11 @@ restart_singbox() {
     fi
 }
 
-# Tự động cập nhật Sing-box Core mới nhất từ GitHub
+# Tự động cập nhật Sing-box Core mới nhất từ GitHub[cite: 3]
 update_singbox_core() {
     log_info "Đang kiểm tra và cập nhật Sing-box Core phiên bản mới nhất..."
     
-    # Kiểm tra kiến trúc hệ thống
+    # Kiểm tra kiến trúc hệ thống[cite: 3]
     local arch
     arch=$(uname -m)
     case "$arch" in
@@ -164,20 +164,152 @@ update_singbox_core() {
 }
 
 # ==========================================
-# CÁC HÀM XỬ LÝ MẠNG VÀ PORT
+# CÁC HÀM TÍNH NĂNG MỚI: XÓA HỆ THỐNG, BẬT BBR, THÊM SWAP
 # ==========================================
 
-# Kiểm tra port đã được sử dụng chưa bằng netcat (nc)
-check_port_in_use() {
-    local port=$1
-    if nc -z 127.0.0.1 "$port" >/dev/null 2>&1; then
-        return 0 # Port đang được sử dụng
+# Xóa toàn bộ mã nguồn, dịch vụ và cấu hình liên quan
+uninstall_system() {
+    check_root
+    log_warn "Cảnh báo: Thao tác này sẽ xóa toàn bộ mã nguồn, dịch vụ và cấu hình hệ thống!"
+    read -p "Bạn có chắc chắn muốn gỡ bỏ hoàn toàn hệ thống không? (y/N): " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        log_info "Đang dừng các dịch vụ hệ thống..."
+        systemctl stop sing-box manager >/dev/null 2>&1 || true
+        systemctl disable sing-box manager >/dev/null 2>&1 || true
+        
+        log_info "Đang xóa các tệp dịch vụ Systemd..."
+        rm -f /etc/systemd/system/sing-box.service
+        rm -f /etc/systemd/system/manager.service
+        systemctl daemon-reload
+        
+        log_info "Đang xóa các tệp nhị phân và lệnh tắt..."
+        rm -f /usr/local/bin/sing-box
+        rm -f /usr/local/bin/vvc
+        rm -rf /etc/sing-box
+        
+        log_info "Đang xóa thư mục mã nguồn $INSTALL_DIR..."
+        if [ -d "$INSTALL_DIR" ]; then
+            rm -rf "$INSTALL_DIR"
+            log_success "Đã gỡ bỏ hoàn toàn hệ thống và dọn dẹp dữ liệu thành công."
+        else
+            log_warn "Thư mục cài đặt không tồn tại hoặc đã được xóa trước đó."
+        fi
     else
-        return 1 # Port chưa được sử dụng (an toàn để dùng)
+        log_info "Đã hủy thao tác gỡ bỏ hệ thống."
     fi
 }
 
-# Sinh port ngẫu nhiên chưa được sử dụng (từ 2000 đến 6000)
+# Bật thuật toán kiểm soát tắc nghẽn TCP BBR
+enable_bbr() {
+    check_root
+    log_info "Đang kiểm tra và cấu hình TCP BBR..."
+    
+    local current_cc
+    current_cc=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
+    if [ "$current_cc" == "bbr" ]; then
+        log_success "TCP BBR đã được kích hoạt từ trước."
+        return 0
+    fi
+
+    local sysctl_conf="/etc/sysctl.conf"
+    if [ ! -f "$sysctl_conf" ]; then
+        log_error "Không tìm thấy tệp cấu hình $sysctl_conf!"
+    fi
+
+    # Xóa các dòng cấu hình cũ nếu có để tránh trùng lặp
+    sed -i '/net.core.default_qdisc/d' "$sysctl_conf"
+    sed -i '/net.ipv4.tcp_congestion_control/d' "$sysctl_conf"
+
+    echo "net.core.default_qdisc=fq" >> "$sysctl_conf"
+    echo "net.ipv4.tcp_congestion_control=bbr" >> "$sysctl_conf"
+
+    if sysctl -p >/dev/null 2>&1; then
+        local check_bbr
+        check_bbr=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
+        if [ "$check_bbr" == "bbr" ]; then
+            log_success "Kích hoạt TCP BBR thành công!"
+        else
+            log_error "Kích hoạt TCP BBR thất bại, hệ thống không chấp nhận cấu hình."
+        fi
+    else
+        log_error "Không thể áp dụng cấu hình sysctl bằng lệnh sysctl -p!"
+    fi
+}
+
+# Thêm bộ nhớ Swap cho hệ thống
+add_swap() {
+    check_root
+    local swap_size="${1:-2G}" # Mặc định 2G nếu không truyền tham số
+    log_info "Đang kiểm tra và thiết lập Swap (dung lượng: $swap_size)..."
+
+    if [ "$(free -m | grep Swap | awk '{print $2}')" -gt 0 ]; then
+        log_warn "Hệ thống đã có phân vùng/tệp Swap đang hoạt động."
+        free -h
+        read -p "Bạn có muốn tạo thêm hoặc thay thế Swap không? (y/N): " swap_confirm
+        if [[ ! "$swap_confirm" =~ ^[Yy]$ ]]; then
+            log_info "Đã hủy thao tác thêm Swap."
+            return 0
+        fi
+    fi
+
+    local swap_file="/swapfile"
+    if [ -f "$swap_file" ]; then
+        log_warn "Tệp $swap_file đã tồn tại. Đang tiến hành tắt và xóa tệp swap cũ..."
+        swapoff "$swap_file" >/dev/null 2>&1 || true
+        rm -f "$swap_file"
+    fi
+
+    log_info "Đang tạo tệp swap dung lượng $swap_size..."
+    if command -v fallocate >/dev/null 2>&1; then
+        fallocate -l "$swap_size" "$swap_file" || dd if=/dev/zero of="$swap_file" bs=1M count=2048 status=progress
+    else
+        dd if=/dev/zero of="$swap_file" bs=1M count=2048 status=progress
+    fi
+
+    if [ ! -f "$swap_file" ]; then
+        log_error "Không thể tạo tệp swap!"
+    fi
+
+    log_info "Đang thiết lập quyền bảo mật cho tệp swap..."
+    chmod 600 "$swap_file"
+
+    log_info "Đang định dạng tệp swap..."
+    if ! mkswap "$swap_file" >/dev/null 2>&1; then
+        rm -f "$swap_file"
+        log_error "Lỗi khi định dạng mkswap cho tệp swap!"
+    fi
+
+    log_info "Đang kích hoạt Swap..."
+    if ! swapon "$swap_file" >/dev/null 2>&1; then
+        rm -f "$swap_file"
+        log_error "Không thể kích hoạt tệp swap bằng swapon!"
+    fi
+
+    # Thêm cấu hình vào /etc/fstab để tự động bật khi khởi động lại (tránh trùng lặp)
+    if ! grep -q "$swap_file" /etc/fstab; then
+        echo "$swap_file none swap sw 0 0" >> /etc/fstab
+        log_success "Đã cấu hình tự động bật Swap khi khởi động lại hệ thống."
+    fi
+
+    log_success "Thiết lập Swap thành công dung lượng $swap_size!"
+    free -h
+}
+
+# ==========================================
+# CÁC HÀM XỬ LÝ MẠNG VÀ PORT[cite: 3]
+# ==========================================
+
+# Kiểm tra port đã được sử dụng chưa bằng netcat (nc)[cite: 3]
+check_port_in_use() {
+    local port=$1
+    if nc -z 127.0.0.1 "$port" >/dev/null 2>&1; then
+        return 0 # Port đang được sử dụng[cite: 3]
+    else
+        return 1 # Port chưa được sử dụng (an toàn để dùng)[cite: 3]
+    fi
+}
+
+# Sinh port ngẫu nhiên chưa được sử dụng (từ 2000 đến 6000)[cite: 3]
 get_random_unused_port() {
     local port
     while true; do
@@ -190,11 +322,10 @@ get_random_unused_port() {
 }
 
 # ==========================================
-# CÁC HÀM XỬ LÝ JSON BẰNG JQ
+# CÁC HÀM XỬ LÝ JSON BẰNG JQ[cite: 3]
 # ==========================================
 
-# Đọc giá trị từ file JSON
-# Cú pháp: read_json_value "file.json" ".key.path"
+# Đọc giá trị từ file JSON[cite: 3]
 read_json_value() {
     local file=$1
     local path=$2
@@ -205,8 +336,7 @@ read_json_value() {
     fi
 }
 
-# Sửa hoặc thêm giá trị (chuỗi) vào file JSON
-# Cú pháp: write_json_string "file.json" ".key.path" "giá trị"
+# Sửa hoặc thêm giá trị (chuỗi) vào file JSON[cite: 3]
 write_json_string() {
     local file=$1
     local path=$2
@@ -218,8 +348,7 @@ write_json_string() {
     fi
 }
 
-# Sửa hoặc thêm giá trị (số/boolean) vào file JSON (không có ngoặc kép)
-# Cú pháp: write_json_raw "file.json" ".key.path" "1234"
+# Sửa hoặc thêm giá trị (số/boolean) vào file JSON[cite: 3]
 write_json_raw() {
     local file=$1
     local path=$2
@@ -231,8 +360,7 @@ write_json_raw() {
     fi
 }
 
-# Trích xuất toàn bộ mảng hoặc object từ JSON để ghép nối
-# Cú pháp: extract_json_block "file.json" ".key.path"
+# Trích xuất toàn bộ mảng hoặc object từ JSON để ghép nối[cite: 3]
 extract_json_block() {
     local file=$1
     local path=$2
