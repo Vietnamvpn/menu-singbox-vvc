@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 INSTALL_DIR="/opt/menu-singbox-vvc"
-REPO_URL="https://github.com/Vietnamvpn/singbox-manager.git"
+REPO_URL="https://github.com/Vietnamvpn/menu-singbox-vvc.git"
 
 log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
