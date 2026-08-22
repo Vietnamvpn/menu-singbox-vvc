@@ -16,7 +16,7 @@ fi
 while true; do
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                 ${YELLOW}ĐIỀU KHIỂN SING-BOX CORE${NC}               ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                 ${YELLOW}ĐIỀU KHIỂN SING-BOX CORE${NC}                   ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
     echo -e " ${YELLOW}Trạng thái Core:${NC} $(get_singbox_status)  │  ${YELLOW}Phiên bản:${NC} $(get_singbox_version)"
     echo -e "${BLUE}================================================================${NC}"
@@ -24,7 +24,7 @@ while true; do
     echo -e " ${GREEN}2.${NC} Dừng Sing-box"
     echo -e " ${GREEN}3.${NC} Khởi Động Lại Sing-box"
     echo -e " ${GREEN}4.${NC} Cập Nhật Sing-box Core Mới Nhất"
-    echo -e "${RED}0.${NC} Quay Lại Menu Chính"
+    echo -e " ${RED}0.${NC} Quay Lại Menu Chính"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn chức năng [0-4]: " choice
 
