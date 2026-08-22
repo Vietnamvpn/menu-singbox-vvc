@@ -43,40 +43,43 @@ show_user_links() {
         return
     fi
     
-    read -p " Nhập số thứ tự user muốn xem link (0 hoặc để trống để quay lại): " user_idx
-    if [ -z "$user_idx" ] || [ "$user_idx" -eq 0 ]; then
+    read -p " Nhập số thứ tự user muốn xem link (để trống xem tất cả, 0 để hủy): " user_idx
+    if [ "$user_idx" = "0" ]; then
         return
     fi
 
-    local real_idx=$((user_idx - 1))
-    local username
-    local secret
-    local user_tag
-    
-    username=$(jq -r --argjson idx "$real_idx" '.[$idx].username // empty' "$USERS_FILE")
-    secret=$(jq -r --argjson idx "$real_idx" '.[$idx].secret // empty' "$USERS_FILE")
-    user_tag=$(jq -r --argjson idx "$real_idx" '.[$idx].tag // empty' "$USERS_FILE")
+    local nodes_to_show
+    if [ -z "$user_idx" ]; then
+        nodes_to_show=$(jq -c '.[]' "$NODES_FILE")
+    else
+        local real_idx=$((user_idx - 1))
+        local user_tag
+        user_tag=$(jq -r --argjson idx "$real_idx" '.[$idx].tag // empty' "$USERS_FILE")
+        local secret
+        secret=$(jq -r --argjson idx "$real_idx" '.[$idx].secret // empty' "$USERS_FILE")
+        local username
+        username=$(jq -r --argjson idx "$real_idx" '.[$idx].username // empty' "$USERS_FILE")
 
-    if [ -z "$username" ]; then
-        echo -e "${RED}Lỗi: Số thứ tự user không hợp lệ!${NC}"
-        sleep 2
-        return
+        if [ -z "$username" ]; then
+            echo -e "${RED}Lỗi: Số thứ tự user không hợp lệ!${NC}"
+            sleep 2
+            return
+        fi
+
+        if [ "$user_tag" = "all" ]; then
+            nodes_to_show=$(jq -c '.[]' "$NODES_FILE")
+        else
+            nodes_to_show=$(jq -c --arg tag "$user_tag" '.[] | select(.tag == $tag)' "$NODES_FILE")
+        fi
     fi
 
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}           LINK KẾT NỐI CHO USER: ${GREEN}$username${NC}"
+    echo -e "${BLUE}                   LINK KẾT NỐI HỆ THỐNG                    ${NC}"
     echo -e "${CYAN}================================================================${NC}"
 
-    local nodes_to_show
-    if [ "$user_tag" = "all" ]; then
-        nodes_to_show=$(jq -c '.[]' "$NODES_FILE")
-    else
-        nodes_to_show=$(jq -c --arg tag "$user_tag" '.[] | select(.tag == $tag)' "$NODES_FILE")
-    fi
-
     if [ -z "$nodes_to_show" ]; then
-        echo -e "${YELLOW}Không tìm thấy node nào phù hợp cho user này.${NC}"
+        echo -e "${YELLOW}Không tìm thấy node nào phù hợp.${NC}"
     else
         local server_ip
         server_ip=$(curl -s https://api.ipify.org || hostname -I | awk '{print $1}')
@@ -91,11 +94,67 @@ show_user_links() {
                 local public_key=$(echo "$node" | jq -r '.public_key // empty')
                 local short_id=$(echo "$node" | jq -r '.short_id // empty')
                 
-                local link
-                link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
-                echo -e "$link"
+                if [ -z "$user_idx" ]; then
+                    jq -r 'to_entries[] | .value as $u | "\($u.username) (\($u.tag))"' "$USERS_FILE" | while read -r u_info; do
+                        # Hiển thị cho tất cả user nếu để trống
+                        true
+                    done
+                fi
             fi
         done
+        
+        # Nếu cụ thể 1 user
+        if [ -n "$user_idx" ]; then
+            local username
+            username=$(jq -r --argjson idx "$((user_idx - 1))" '.[$idx].username' "$USERS_FILE")
+            local secret
+            secret=$(jq -r --argjson idx "$((user_idx - 1))" '.[$idx].secret' "$USERS_FILE")
+            
+            echo -e "${BLUE}User: ${GREEN}$username${NC}"
+            echo "$nodes_to_show" | while read -r node; do
+                local type=$(echo "$node" | jq -r '.type')
+                local tag=$(echo "$node" | jq -r '.tag')
+                local port=$(echo "$node" | jq -r '.port')
+                if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
+                    local sni=$(echo "$node" | jq -r '.sni // .server_name')
+                    local public_key=$(echo "$node" | jq -r '.public_key // empty')
+                    local short_id=$(echo "$node" | jq -r '.short_id // empty')
+                    local link
+                    link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                    echo -e "$link"
+                fi
+            done
+        else
+            # Tất cả user
+            jq -c 'to_entries[]' "$USERS_FILE" | while read -r u_entry; do
+                local u_idx=$(echo "$u_entry" | jq -r '.key')
+                local username=$(echo "$u_entry" | jq -r '.value.username')
+                local secret=$(echo "$u_entry" | jq -r '.value.secret')
+                local u_tag=$(echo "$u_entry" | jq -r '.value.tag')
+                
+                echo -e "${BLUE}--- User: ${GREEN}$username${NC} ---"
+                local u_nodes
+                if [ "$u_tag" = "all" ]; then
+                    u_nodes=$(jq -c '.[]' "$NODES_FILE")
+                else
+                    u_nodes=$(jq -c --arg tag "$u_tag" '.[] | select(.tag == $tag)' "$NODES_FILE")
+                fi
+                
+                echo "$u_nodes" | while read -r node; do
+                    local type=$(echo "$node" | jq -r '.type')
+                    local tag=$(echo "$node" | jq -r '.tag')
+                    local port=$(echo "$node" | jq -r '.port')
+                    if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
+                        local sni=$(echo "$node" | jq -r '.sni // .server_name')
+                        local public_key=$(echo "$node" | jq -r '.public_key // empty')
+                        local short_id=$(echo "$node" | jq -r '.short_id // empty')
+                        local link
+                        link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                        echo -e "$link"
+                    fi
+                done
+            done
+        fi
     fi
     echo -e "${CYAN}================================================================${NC}"
     read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
@@ -113,7 +172,7 @@ add_user() {
         return
     fi
 
-    echo -e "${GREEN}Danh sách các giao thức/node hiện có:${NC}"
+    echo -e "${GREEN}Danh sách các giao thức:${NC}"
     local node_list=()
     if command -v jq &> /dev/null; then
         local i=1
@@ -123,25 +182,29 @@ add_user() {
             i=$((i + 1))
         done < <(jq -r '.[] | .tag, .type' "$NODES_FILE")
     fi
-    echo -e " ${GREEN}0.${NC} Gán vào tất cả các node"
+    echo -e " ${RED}0.${NC} Hủy bỏ / Quay lại"
     echo -e "${CYAN}================================================================${NC}"
 
-    read -p " Nhập số thứ tự node muốn gán (0 hoặc để trống để gán tất cả): " node_choice
+    read -p " Nhập số thứ tự node muốn gán (để trống gán tất cả, 0 để hủy): " node_choice
+
+    if [ "$node_choice" = "0" ]; then
+        return
+    fi
 
     local target_tag="all"
-    if [ -n "$node_choice" ] && [ "$node_choice" -ne 0 ]; then
+    if [ -n "$node_choice" ]; then
         local idx=$((node_choice - 1))
         if [ $idx -ge 0 ] && [ $idx -lt ${#node_list[@]} ]; then
             target_tag="${node_list[$idx]}"
         else
-            echo -e "${RED}Lựa chọn không hợp lệ, mặc định gán vào tất cả các node!${NC}"
-            target_tag="all"
+            echo -e "${RED}Lựa chọn không hợp lệ!${NC}"
             sleep 2
+            return
         fi
     fi
 
-    read -p " Nhập tên User (Username) (Nhập 0 hoặc để trống để hủy): " username
-    if [ -z "$username" ] || [ "$username" = "0" ]; then
+    read -p " Nhập tên User (Username) (0 để hủy): " username
+    if [ "$username" = "0" ] || [ -z "$username" ]; then
         return
     fi
 
@@ -182,24 +245,33 @@ delete_user() {
         return
     fi
     
-    read -p " Nhập số thứ tự user cần xóa (0 hoặc để trống để quay lại): " user_idx
-    if [ -z "$user_idx" ] || [ "$user_idx" -eq 0 ]; then
-        return
-    fi
-
-    local real_idx=$((user_idx - 1))
-    local username
-    username=$(jq -r --argjson idx "$real_idx" '.[$idx].username // empty' "$USERS_FILE")
-
-    if [ -z "$username" ]; then
-        echo -e "${RED}Lỗi: Số thứ tự user không hợp lệ!${NC}"
-        sleep 2
+    read -p " Nhập số thứ tự user cần xóa (để trống xóa tất cả, 0 để hủy): " user_choice
+    if [ "$user_choice" = "0" ]; then
         return
     fi
 
     if command -v jq &> /dev/null; then
-        jq --arg username "$username" '[.[] | select(.username != $username)]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
-        echo -e "${GREEN}Đã xóa user: $username${NC}"
+        if [ -z "$user_choice" ]; then
+            echo "[]" > "$USERS_FILE"
+            echo -e "${GREEN}Đã xóa tất cả user!${NC}"
+        else
+            local indices=()
+            for idx in $user_choice; do
+                if [[ "$idx" =~ ^[0-9]+$ ]] && [ "$idx" -gt 0 ]; then
+                    indices+=($((idx - 1)))
+                fi
+            done
+            
+            if [ ${#indices[@]} -eq 0 ]; then
+                echo -e "${RED}Lỗi: Số thứ tự không hợp lệ!${NC}"
+                sleep 2
+                return
+            fi
+            
+            local jq_filter="del(.[$(IFS=','; echo "${indices[*]}")] )"
+            jq "$jq_filter" "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+            echo -e "${GREEN}Đã xóa các user được chọn!${NC}"
+        fi
         build_and_apply_config
     else
         echo -e "${RED}Thiếu công cụ jq để xử lý JSON.${NC}"
@@ -214,36 +286,42 @@ reset_user_token() {
         return
     fi
     
-    read -p " Nhập số thứ tự user cần reset token (0 hoặc để trống để quay lại): " user_idx
-    if [ -z "$user_idx" ] || [ "$user_idx" -eq 0 ]; then
+    read -p " Nhập số thứ tự user cần reset token (để trống reset tất cả, 0 để hủy): " user_choice
+    if [ "$user_choice" = "0" ]; then
         return
     fi
 
-    local real_idx=$((user_idx - 1))
-    local username
-    username=$(jq -r --argjson idx "$real_idx" '.[$idx].username // empty' "$USERS_FILE")
+    if command -v jq &> /dev/null; then
+        local new_secret=""
+        if command -v uuidgen >/dev/null 2>&1; then
+            new_secret=$(uuidgen)
+        else
+            new_secret=$(cat /proc/sys/kernel/random/uuid)
+        fi
 
-    if [ -z "$username" ]; then
-        echo -e "${RED}Lỗi: Số thứ tự user không hợp lệ!${NC}"
-        sleep 2
-        return
-    fi
+        if [ -z "$user_choice" ]; then
+            jq --arg secret "$new_secret" '[.[] | .secret = $secret]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+            echo -e "${GREEN}Đã reset token thành công cho tất cả user!${NC}"
+        else
+            local real_idx=$((user_choice - 1))
+            local username
+            username=$(jq -r --argjson idx "$real_idx" '.[$idx].username // empty' "$USERS_FILE")
 
-    local new_secret=""
-    if command -v uuidgen >/dev/null 2>&1; then
-        new_secret=$(uuidgen)
-    else
-        new_secret=$(cat /proc/sys/kernel/random/uuid)
-    fi
-    
-    if jq --arg username "$username" \
-       --arg secret "$new_secret" \
-       '(.[] | select(.username == $username).secret) = $secret' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"; then
-        echo -e "${GREEN}Đã reset token thành công cho user: $username${NC}"
-        echo -e "${GREEN}Token mới: $new_secret${NC}"
+            if [ -z "$username" ]; then
+                echo -e "${RED}Lỗi: Số thứ tự user không hợp lệ!${NC}"
+                sleep 2
+                return
+            fi
+            
+            jq --arg username "$username" \
+               --arg secret "$new_secret" \
+               '(.[] | select(.username == $username).secret) = $secret' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+            echo -e "${GREEN}Đã reset token thành công cho user: $username${NC}"
+            echo -e "${GREEN}Token mới: $new_secret${NC}"
+        fi
         build_and_apply_config
     else
-        echo -e "${RED}Lỗi: Không thể cập nhật token trong tệp users.json!${NC}"
+        echo -e "${RED}Thiếu công cụ jq để xử lý JSON.${NC}"
     fi
     sleep 2
 }
@@ -253,11 +331,11 @@ while true; do
     echo -e "${CYAN}================================================================${NC}"
     echo -e "${BLUE}                     QUẢN LÝ THÔNG TIN USER                   ${NC}"
     echo -e "${CYAN}================================================================${NC}"
-    echo -e " ${GREEN}1.${NC} Hiển thị danh sách User & Xem Link"
-    echo -e " ${GREEN}2.${NC} Thêm User mới"
+    echo -e " ${GREEN}1.${NC} Xem Danh Sách User & Link"
+    echo -e " ${GREEN}2.${NC} Thêm User Mới"
     echo -e " ${GREEN}3.${NC} Xóa User"
     echo -e " ${GREEN}4.${NC} Reset Token User"
-    echo -e "${RED}0.${NC} Quay lại Menu chính"
+    echo -e "${RED}0.${NC} Quay Lại Menu Chính"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn chức năng [0-4]: " choice
 
