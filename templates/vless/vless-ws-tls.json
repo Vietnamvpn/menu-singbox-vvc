@@ -1,6 +1,6 @@
 {
   "type": "vless",
-  "tag": "inbound-vless-ws-tls-{{PORT}}",
+  "tag": "vless-ws-tls-{{PORT}}",
   "listen": "::",
   "listen_port": "{{PORT}}",
   "users": [

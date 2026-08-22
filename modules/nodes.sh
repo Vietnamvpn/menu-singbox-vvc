@@ -1,10 +1,20 @@
 #!/bin/bash
 
+# Khai báo đường dẫn gốc chính xác
+INSTALL_DIR="/opt/menu-singbox-vvc"
 NODES_FILE="$INSTALL_DIR/data/nodes.json"
 mkdir -p "$INSTALL_DIR/data"
 
 if [ ! -f "$NODES_FILE" ]; then
     echo "[]" > "$NODES_FILE"
+fi
+
+# Nhúng màu sắc và các hàm tiện ích dùng chung từ utils.sh
+if [ -f "$INSTALL_DIR/modules/utils.sh" ]; then
+    source "$INSTALL_DIR/modules/utils.sh"
+else
+    echo "Lỗi: Không tìm thấy file utils.sh tại $INSTALL_DIR/modules/"
+    exit 1
 fi
 
 # ====================================================================
@@ -14,21 +24,19 @@ fi
 # Kiểm tra port đã sử dụng trong config hoặc đang mở trên hệ thống chưa
 check_port_usage() {
     local check_port=$1
-    # Kiểm tra trong cấu hình nodes.json
     if grep -q "\"port\": *$check_port\b" "$NODES_FILE" 2>/dev/null; then
-        return 1 # Đã dùng
+        return 1
     fi
-    # Kiểm tra port đang nghe trên hệ thống
     if command -v ss >/dev/null 2>&1; then
         if ss -tuln | grep -qE ":$check_port\b"; then
-            return 1 # Đã dùng
+            return 1
         fi
     elif command -v netstat >/dev/null 2>&1; then
          if netstat -tuln | grep -qE ":$check_port\b"; then
-            return 1 # Đã dùng
+            return 1
          fi
     fi
-    return 0 # Trống (Chưa sử dụng)
+    return 0
 }
 
 # Lấy một port ngẫu nhiên chưa ai dùng
@@ -42,17 +50,14 @@ get_random_port() {
     done
 }
 
-# Tự động mở port trên các loại tường lửa phổ biến
+# Tự động mở port trên các loại tường lửa
 open_firewall_port() {
     local port=$1
     echo -e "${YELLOW} Đang kiểm tra và mở port $port trên tường lửa...${NC}"
-    
-    # UFW (Ubuntu/Debian)
     if command -v ufw >/dev/null 2>&1; then
         ufw allow "$port"/tcp >/dev/null 2>&1
         ufw allow "$port"/udp >/dev/null 2>&1
     fi
-    # iptables
     if command -v iptables >/dev/null 2>&1; then
         iptables -I INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null
         iptables -I INPUT -p udp --dport "$port" -j ACCEPT 2>/dev/null
@@ -60,7 +65,6 @@ open_firewall_port() {
             netfilter-persistent save >/dev/null 2>&1
         fi
     fi
-    # firewalld (CentOS/Alma/Rocky)
     if command -v firewall-cmd >/dev/null 2>&1; then
         firewall-cmd --add-port="${port}/tcp" --permanent >/dev/null 2>&1
         firewall-cmd --add-port="${port}/udp" --permanent >/dev/null 2>&1
@@ -69,7 +73,7 @@ open_firewall_port() {
     echo -e "${GREEN} -> Đã mở port $port thành công.${NC}"
 }
 
-# Xử lý vòng lặp bắt buộc nhập/tạo Port hợp lệ
+# 1. Form nhập Port
 ASKED_PORT=""
 ask_port() {
     while true; do
@@ -79,9 +83,9 @@ ask_port() {
             echo -e "${GREEN} -> Đã chọn Port ngẫu nhiên chưa sử dụng: $ASKED_PORT${NC}"
             break
         elif ! [[ "$ASKED_PORT" =~ ^[0-9]+$ ]] || [ "$ASKED_PORT" -lt 1 ] || [ "$ASKED_PORT" -gt 65535 ]; then
-            echo -e "${RED}Lỗi: Port không hợp lệ, vui lòng nhập số từ 1-65535!${NC}"
+            echo -e "${RED}Lỗi: Port không hợp lệ!${NC}"
         elif ! check_port_usage "$ASKED_PORT"; then
-            echo -e "${RED}Lỗi: Port $ASKED_PORT đã có người dùng hoặc đang chạy ngầm, chọn port khác!${NC}"
+            echo -e "${RED}Lỗi: Port $ASKED_PORT đã có người dùng, chọn port khác!${NC}"
         else
             break
         fi
@@ -89,64 +93,62 @@ ask_port() {
     open_firewall_port "$ASKED_PORT"
 }
 
-# Xử lý SNI
+# 2. Form nhập SNI
 ASKED_SNI=""
 ask_sni() {
     read -p " Nhập SNI (Server Name) [Để trống = tự tạo ngẫu nhiên]: " ASKED_SNI
     if [ -z "$ASKED_SNI" ]; then
-        local snis=("itunes.apple.com" "www.microsoft.com" "www.bing.com" "update.microsoft.com" "gateway.icloud.com" "swdist.apple.com")
+        local snis=("itunes.apple.com" "www.microsoft.com" "www.bing.com" "update.microsoft.com" "gateway.icloud.com")
         local index=$((RANDOM % ${#snis[@]}))
         ASKED_SNI="${snis[$index]}"
         echo -e "${GREEN} -> Đã tự chọn SNI ngẫu nhiên: $ASKED_SNI${NC}"
     fi
 }
 
-# Xử lý Domain
+# 3. Form nhập Domain (Linh hoạt lấy theo IP, Port, SNI nếu trống)
 ASKED_DOMAIN=""
 ask_domain() {
-    read -p " Nhập Tên miền (Domain) [Để trống = tự tạo ngẫu nhiên]: " ASKED_DOMAIN
+    read -p " Nhập Tên miền (Domain) [Để trống = tự tạo theo IP/SNI]: " ASKED_DOMAIN
     if [ -z "$ASKED_DOMAIN" ]; then
-        ASKED_DOMAIN="node-$((RANDOM % 90000 + 10000)).example.com"
-        echo -e "${GREEN} -> Đã tạo Domain ảo ngẫu nhiên: $ASKED_DOMAIN${NC}"
-        echo -e "${YELLOW} Lưu ý: Bạn cần cấp chứng chỉ thực cho Domain này sau nếu dùng TLS.${NC}"
+        local ip=$(curl -s4 ifconfig.me || echo "127.0.0.1")
+        if [ -n "$ASKED_SNI" ]; then
+            ASKED_DOMAIN="$ASKED_SNI"
+        else
+            ASKED_DOMAIN="${ip}.nip.io"
+        fi
+        echo -e "${GREEN} -> Đã tạo Domain tự động: $ASKED_DOMAIN${NC}"
     fi
 }
 
-# Xử lý Private Key Reality
-ASKED_PK=""
-ask_private_key() {
-    read -p " Nhập Private Key [Để trống = tự tạo ngẫu nhiên]: " ASKED_PK
-    if [ -z "$ASKED_PK" ]; then
-        if command -v sing-box &> /dev/null; then
-            local kp=$(sing-box generate reality-keypair)
-            ASKED_PK=$(echo "$kp" | grep "PrivateKey" | awk '{print $2}')
-            echo -e "${GREEN} -> Đã tự tạo Private Key bằng sing-box core.${NC}"
-        else
-            ASKED_PK=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 43)
-            echo -e "${GREEN} -> Đã tạo Private Key ngẫu nhiên thay thế.${NC}"
-        fi
+# 4. Form nhập Tag
+ASKED_TAG=""
+ask_tag() {
+    local default_prefix=$1
+    read -p " Nhập Tag cho Node [Để trống = ngẫu nhiên]: " ASKED_TAG
+    if [ -z "$ASKED_TAG" ]; then
+        ASKED_TAG="${default_prefix}-${ASKED_PORT}-$((RANDOM % 9000 + 1000))"
+        echo -e "${GREEN} -> Đã tạo Tag tự động: $ASKED_TAG${NC}"
     fi
 }
 
-# Xử lý Short ID Reality
-ASKED_SHORT_ID=""
-ask_short_id() {
-    read -p " Nhập Short ID [Để trống = tự tạo ngẫu nhiên]: " ASKED_SHORT_ID
-    if [ -z "$ASKED_SHORT_ID" ]; then
-        if command -v openssl >/dev/null 2>&1; then
-            ASKED_SHORT_ID=$(openssl rand -hex 4)
-        else
-            ASKED_SHORT_ID=$(tr -dc 'a-f0-9' </dev/urandom | head -c 8)
-        fi
-        echo -e "${GREEN} -> Đã tạo Short ID ngẫu nhiên: $ASKED_SHORT_ID${NC}"
-    fi
+# 5. Form nhập Chứng chỉ
+ASKED_CERT=""
+ASKED_KEY=""
+ask_cert() {
+    read -p " Nhập đường dẫn Certificate [Để trống = dùng mặc định của hệ thống]: " ASKED_CERT
+    ASKED_CERT="${ASKED_CERT:-$INSTALL_DIR/certs/default/cert.pem}"
+    
+    read -p " Nhập đường dẫn Private Key [Để trống = dùng mặc định của hệ thống]: " ASKED_KEY
+    ASKED_KEY="${ASKED_KEY:-$INSTALL_DIR/certs/default/private.key}"
+    
+    echo -e "${GREEN} -> Cert: $ASKED_CERT${NC}"
+    echo -e "${GREEN} -> Key: $ASKED_KEY${NC}"
 }
 
 # Hàm kiểm tra trùng lặp Tag
 check_tag_exists() {
-    local tag_to_check=$1
-    if grep -q "\"tag\": \"$tag_to_check\"" "$NODES_FILE" 2>/dev/null; then
-        echo -e "${RED}Lỗi: Node với tag '$tag_to_check' đã tồn tại! Hủy bỏ thao tác.${NC}"
+    if grep -q "\"tag\": \"$ASKED_TAG\"" "$NODES_FILE" 2>/dev/null; then
+        echo -e "${RED}Lỗi: Node với tag '$ASKED_TAG' đã tồn tại! Hủy bỏ thao tác.${NC}"
         sleep 2
         return 1
     fi
@@ -154,10 +156,50 @@ check_tag_exists() {
 }
 
 # ====================================================================
+# CÁC HÀM AUTO-GENERATE (KHÔNG CẦN FORM NHẬP)
+# ====================================================================
+
+AUTO_PK=""
+generate_private_key() {
+    if command -v sing-box &> /dev/null; then
+        local kp=$(sing-box generate reality-keypair)
+        AUTO_PK=$(echo "$kp" | grep "PrivateKey" | awk '{print $2}')
+    else
+        AUTO_PK=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 43)
+    fi
+    echo -e "${GREEN} -> Đã tự động tạo Private Key.${NC}"
+}
+
+AUTO_SHORT_ID=""
+generate_short_id() {
+    if command -v openssl >/dev/null 2>&1; then
+        AUTO_SHORT_ID=$(openssl rand -hex 4)
+    else
+        AUTO_SHORT_ID=$(tr -dc 'a-f0-9' </dev/urandom | head -c 8)
+    fi
+    echo -e "${GREEN} -> Đã tự động tạo Short ID: $AUTO_SHORT_ID${NC}"
+}
+
+AUTO_UUID=""
+generate_uuid() {
+    if command -v uuidgen >/dev/null 2>&1; then
+        AUTO_UUID=$(uuidgen)
+    else
+        AUTO_UUID=$(cat /proc/sys/kernel/random/uuid)
+    fi
+    echo -e "${GREEN} -> Đã tự động tạo UUID.${NC}"
+}
+
+AUTO_PASS=""
+generate_password() {
+    AUTO_PASS=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
+    echo -e "${GREEN} -> Đã tự động tạo Password.${NC}"
+}
+
+# ====================================================================
 # MENU VÀ GIAO DIỆN QUẢN LÝ
 # ====================================================================
 
-# Hiển thị danh sách Node
 list_nodes() {
     clear
     echo -e "${CYAN}================================================================${NC}"
@@ -185,18 +227,19 @@ form_vless_reality() {
     
     ask_port
     ask_sni
-    ask_private_key
-    ask_short_id
+    ask_tag "vless-reality"
+    
+    check_tag_exists || return
 
-    local tag="inbound-vless-reality-${ASKED_PORT}"
-    check_tag_exists "$tag" || return
+    generate_private_key
+    generate_short_id
 
-    jq --arg tag "$tag" \
+    jq --arg tag "$ASKED_TAG" \
        --arg type "vless-reality" \
        --argjson port "$ASKED_PORT" \
        --arg sni "$ASKED_SNI" \
-       --arg private_key "$ASKED_PK" \
-       --arg short_id "$ASKED_SHORT_ID" \
+       --arg private_key "$AUTO_PK" \
+       --arg short_id "$AUTO_SHORT_ID" \
        '. += [{
            "tag": $tag,
            "type": $type,
@@ -206,7 +249,7 @@ form_vless_reality() {
            "short_id": $short_id
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    echo -e "${GREEN}Thêm Node VLESS REALITY thành công! Tag: $tag${NC}"
+    echo -e "${GREEN}Thêm Node VLESS REALITY thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
 }
 
@@ -219,29 +262,21 @@ form_vless_ws_tls() {
 
     ask_port
     ask_domain
+    ask_cert
+    ask_tag "vless-ws-tls"
+    
+    check_tag_exists || return
 
-    read -p " Nhập WS Path [Để trống = tự tạo]: " ws_path
-    if [ -z "$ws_path" ]; then
-        ws_path="/ws-$(tr -dc 'a-z0-9' </dev/urandom | head -c 6)"
-        echo -e "${GREEN} -> Đã tạo WS Path ngẫu nhiên: $ws_path${NC}"
-    fi
+    local auto_ws_path="/ws-$(tr -dc 'a-z0-9' </dev/urandom | head -c 6)"
+    echo -e "${GREEN} -> Đã tự động tạo WS Path: $auto_ws_path${NC}"
 
-    read -p " Nhập đường dẫn Certificate [Để trống = mặc định]: " cert_path
-    cert_path="${cert_path:-$INSTALL_DIR/certs/$ASKED_DOMAIN/cert.pem}"
-
-    read -p " Nhập đường dẫn Key [Để trống = mặc định]: " key_path
-    key_path="${key_path:-$INSTALL_DIR/certs/$ASKED_DOMAIN/key.pem}"
-
-    local tag="inbound-vless-ws-tls-${ASKED_PORT}"
-    check_tag_exists "$tag" || return
-
-    jq --arg tag "$tag" \
+    jq --arg tag "$ASKED_TAG" \
        --arg type "vless-ws-tls" \
        --argjson port "$ASKED_PORT" \
        --arg domain "$ASKED_DOMAIN" \
-       --arg ws_path "$ws_path" \
-       --arg cert_path "$cert_path" \
-       --arg key_path "$key_path" \
+       --arg ws_path "$auto_ws_path" \
+       --arg cert_path "$ASKED_CERT" \
+       --arg key_path "$ASKED_KEY" \
        '. += [{
            "tag": $tag,
            "type": $type,
@@ -252,7 +287,7 @@ form_vless_ws_tls() {
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    echo -e "${GREEN}Thêm Node VLESS WS TLS thành công! Tag: $tag${NC}"
+    echo -e "${GREEN}Thêm Node VLESS WS TLS thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
 }
 
@@ -264,27 +299,24 @@ form_vless_grpc_reality() {
     echo -e "${CYAN}================================================================${NC}"
 
     ask_port
-    
-    read -p " Nhập gRPC Service Name [Để trống = tự tạo]: " grpc_service
-    if [ -z "$grpc_service" ]; then
-        grpc_service="grpc-$(tr -dc 'a-z0-9' </dev/urandom | head -c 6)"
-        echo -e "${GREEN} -> Đã tạo gRPC Service ngẫu nhiên: $grpc_service${NC}"
-    fi
-
     ask_sni
-    ask_private_key
-    ask_short_id
+    ask_tag "vless-grpc-reality"
+    
+    check_tag_exists || return
 
-    local tag="inbound-vless-grpc-reality-${ASKED_PORT}"
-    check_tag_exists "$tag" || return
+    local auto_grpc="grpc-$(tr -dc 'a-z0-9' </dev/urandom | head -c 6)"
+    echo -e "${GREEN} -> Đã tự động tạo gRPC Service: $auto_grpc${NC}"
+    
+    generate_private_key
+    generate_short_id
 
-    jq --arg tag "$tag" \
+    jq --arg tag "$ASKED_TAG" \
        --arg type "vless-grpc-reality" \
        --argjson port "$ASKED_PORT" \
-       --arg grpc_service "$grpc_service" \
+       --arg grpc_service "$auto_grpc" \
        --arg sni "$ASKED_SNI" \
-       --arg private_key "$ASKED_PK" \
-       --arg short_id "$ASKED_SHORT_ID" \
+       --arg private_key "$AUTO_PK" \
+       --arg short_id "$AUTO_SHORT_ID" \
        '. += [{
            "tag": $tag,
            "type": $type,
@@ -295,7 +327,7 @@ form_vless_grpc_reality() {
            "short_id": $short_id
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    echo -e "${GREEN}Thêm Node VLESS gRPC REALITY thành công! Tag: $tag${NC}"
+    echo -e "${GREEN}Thêm Node VLESS gRPC REALITY thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
 }
 
@@ -308,37 +340,25 @@ form_hy2() {
 
     ask_port
     ask_domain
+    ask_cert
+    ask_tag "hy2"
     
-    read -p " Nhập Password [Để trống = tự tạo ngẫu nhiên]: " password
-    if [ -z "$password" ]; then
-        password=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
-        echo -e "${GREEN} -> Đã tạo Password ngẫu nhiên: $password${NC}"
-    fi
-    
-    read -p " Nhập tốc độ Upload (UP_MBPS) [Để trống = mặc định 100]: " up_mbps
-    up_mbps="${up_mbps:-100}"
-    
-    read -p " Nhập tốc độ Download (DOWN_MBPS) [Để trống = mặc định 100]: " down_mbps
-    down_mbps="${down_mbps:-100}"
+    check_tag_exists || return
 
-    read -p " Nhập đường dẫn Certificate [Để trống = mặc định]: " cert_path
-    cert_path="${cert_path:-$INSTALL_DIR/certs/$ASKED_DOMAIN/cert.pem}"
+    generate_password
+    local auto_up_mbps="100"
+    local auto_down_mbps="100"
+    echo -e "${GREEN} -> Đã tự động gán tốc độ UP/DOWN mặc định là 100 Mbps.${NC}"
 
-    read -p " Nhập đường dẫn Key [Để trống = mặc định]: " key_path
-    key_path="${key_path:-$INSTALL_DIR/certs/$ASKED_DOMAIN/key.pem}"
-
-    local tag="inbound-hy2-${ASKED_PORT}"
-    check_tag_exists "$tag" || return
-
-    jq --arg tag "$tag" \
+    jq --arg tag "$ASKED_TAG" \
        --arg type "hysteria2" \
        --argjson port "$ASKED_PORT" \
        --arg domain "$ASKED_DOMAIN" \
-       --arg password "$password" \
-       --arg up_mbps "$up_mbps" \
-       --arg down_mbps "$down_mbps" \
-       --arg cert_path "$cert_path" \
-       --arg key_path "$key_path" \
+       --arg password "$AUTO_PASS" \
+       --arg up_mbps "$auto_up_mbps" \
+       --arg down_mbps "$auto_down_mbps" \
+       --arg cert_path "$ASKED_CERT" \
+       --arg key_path "$ASKED_KEY" \
        '. += [{
            "tag": $tag,
            "type": $type,
@@ -351,7 +371,7 @@ form_hy2() {
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    echo -e "${GREEN}Thêm Node Hysteria 2 thành công! Tag: $tag${NC}"
+    echo -e "${GREEN}Thêm Node Hysteria 2 thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
 }
 
@@ -364,40 +384,22 @@ form_tuic() {
 
     ask_port
     ask_domain
+    ask_cert
+    ask_tag "tuic"
     
-    read -p " Nhập UUID [Để trống = tự tạo ngẫu nhiên]: " uuid
-    if [ -z "$uuid" ]; then
-        if command -v uuidgen >/dev/null 2>&1; then
-            uuid=$(uuidgen)
-        else
-            uuid=$(cat /proc/sys/kernel/random/uuid)
-        fi
-        echo -e "${GREEN} -> Đã tạo UUID ngẫu nhiên: $uuid${NC}"
-    fi
+    check_tag_exists || return
 
-    read -p " Nhập Password [Để trống = tự tạo ngẫu nhiên]: " password
-    if [ -z "$password" ]; then
-        password=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
-        echo -e "${GREEN} -> Đã tạo Password ngẫu nhiên: $password${NC}"
-    fi
+    generate_uuid
+    generate_password
 
-    read -p " Nhập đường dẫn Certificate [Để trống = mặc định]: " cert_path
-    cert_path="${cert_path:-$INSTALL_DIR/certs/$ASKED_DOMAIN/cert.pem}"
-
-    read -p " Nhập đường dẫn Key [Để trống = mặc định]: " key_path
-    key_path="${key_path:-$INSTALL_DIR/certs/$ASKED_DOMAIN/key.pem}"
-
-    local tag="inbound-tuic-${ASKED_PORT}"
-    check_tag_exists "$tag" || return
-
-    jq --arg tag "$tag" \
+    jq --arg tag "$ASKED_TAG" \
        --arg type "tuic" \
        --argjson port "$ASKED_PORT" \
        --arg domain "$ASKED_DOMAIN" \
-       --arg uuid "$uuid" \
-       --arg password "$password" \
-       --arg cert_path "$cert_path" \
-       --arg key_path "$key_path" \
+       --arg uuid "$AUTO_UUID" \
+       --arg password "$AUTO_PASS" \
+       --arg cert_path "$ASKED_CERT" \
+       --arg key_path "$ASKED_KEY" \
        '. += [{
            "tag": $tag,
            "type": $type,
@@ -409,7 +411,7 @@ form_tuic() {
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    echo -e "${GREEN}Thêm Node TUIC thành công! Tag: $tag${NC}"
+    echo -e "${GREEN}Thêm Node TUIC thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
 }
 

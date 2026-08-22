@@ -1,6 +1,6 @@
 {
   "type": "vless",
-  "tag": "inbound-vless-grpc-reality-{{PORT}}",
+  "tag": "vless-grpc-reality-{{PORT}}",
   "listen": "::",
   "listen_port": "{{PORT}}",
   "users": [

@@ -1,6 +1,6 @@
 {
   "type": "hysteria2",
-  "tag": "inbound-hy2-{{PORT}}",
+  "tag": "hy2-{{PORT}}",
   "listen": "::",
   "listen_port": "{{PORT}}",
   "users": [

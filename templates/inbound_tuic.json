@@ -1,6 +1,6 @@
 {
   "type": "tuic",
-  "tag": "inbound-tuic-{{PORT}}",
+  "tag": "tuic-{{PORT}}",
   "listen": "::",
   "listen_port": "{{PORT}}",
   "users": [
