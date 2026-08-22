@@ -370,3 +370,48 @@ extract_json_block() {
         echo "[]"
     fi
 }
+
+# ==========================================
+# HÀM BIÊN DỊCH VÀ ÁP DỤNG CẤU HÌNH (BUILD)
+# ==========================================
+
+build_and_apply_config() {
+    log_info "Đang tiến hành biên dịch cấu hình Sing-box..."
+    
+    local base_config="${INSTALL_DIR}/templates/config.base.json"
+    local dest_config="/etc/sing-box/config.json"
+    local users_data="${INSTALL_DIR}/data/users.json"
+    
+    # 1. Kiểm tra sự tồn tại của file nguồn
+    if [ ! -f "$base_config" ]; then
+        log_error "File mẫu $base_config không tồn tại!"
+    fi
+
+    # 2. Kiểm tra thư mục đích
+    if [ ! -d "/etc/sing-box" ]; then
+        mkdir -p "/etc/sing-box"
+    fi
+
+    # 3. Biên dịch cấu hình
+    # Lưu ý: Lệnh jq dưới đây là ví dụ để "trộn" dữ liệu users vào trường "inbounds" của file config.
+    # Bạn cần tùy chỉnh phần filter trong jq (...) nếu cấu trúc JSON của bạn khác.
+    log_info "Đang trộn dữ liệu người dùng vào cấu hình mẫu..."
+    
+    if jq -s '.[0] * {inbounds: .[1]}' "$base_config" <(jq '{inbounds: .}' "$users_data") > "${dest_config}.tmp"; then
+        # Di chuyển file tạm vào vị trí chính thức
+        mv "${dest_config}.tmp" "$dest_config"
+        log_success "Biên dịch cấu hình thành công tại $dest_config"
+        
+        # 4. Kiểm tra cấu hình và Khởi động lại Sing-box
+        log_info "Đang kiểm tra tính hợp lệ của cấu hình vừa tạo..."
+        if sing-box check -c "$dest_config" >/dev/null 2>&1; then
+            log_success "Cấu hình hợp lệ!"
+            restart_singbox
+        else
+            log_error "Cấu hình không hợp lệ! Vui lòng kiểm tra lại dữ liệu JSON."
+        fi
+    else
+        rm -f "${dest_config}.tmp"
+        log_error "Biên dịch thất bại! Lỗi cú pháp JSON."
+    fi
+}
