@@ -108,6 +108,32 @@ delete_user() {
     sleep 2
 }
 
+reset_user_token() {
+    clear
+    list_users
+    read -p " Nhập username của user cần reset token: " username
+    if [ -z "$username" ]; then return; fi
+
+    if ! grep -q "\"username\": \"$username\"" "$USERS_FILE" 2>/dev/null; then
+        echo -e "${RED}Lỗi: Không tìm thấy user '$username'!${NC}"
+        sleep 2
+        return
+    fi
+
+    local new_secret=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
+    
+    if jq --arg username "$username" \
+       --arg secret "$new_secret" \
+       '(.[] | select(.username == $username).secret) = $secret' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"; then
+        echo -e "${GREEN}Đã reset token thành công cho user: $username${NC}"
+        echo -e "${GREEN}Token mới: $new_secret${NC}"
+        build_and_apply_config
+    else
+        echo -e "${RED}Lỗi: Không thể cập nhật token trong tệp users.json!${NC}"
+    fi
+    sleep 2
+}
+
 while true; do
     clear
     echo -e "${CYAN}================================================================${NC}"
@@ -116,9 +142,10 @@ while true; do
     echo -e " ${GREEN}1.${NC} Hiển thị danh sách User"
     echo -e " ${GREEN}2.${NC} Thêm User mới"
     echo -e " ${GREEN}3.${NC} Xóa User"
+    echo -e " ${GREEN}4.${NC} Reset Token User"
     echo -e " ${RED}0.${NC} Quay lại Menu chính"
     echo -e "${CYAN}================================================================${NC}"
-    read -p " Vui lòng chọn chức năng [0-3]: " choice
+    read -p " Vui lòng chọn chức năng [0-4]: " choice
 
     case $choice in
         1)
@@ -130,6 +157,9 @@ while true; do
             ;;
         3)
             delete_user
+            ;;
+        4)
+            reset_user_token
             ;;
         0)
             break
