@@ -55,8 +55,6 @@ show_user_links() {
         local real_idx=$((user_idx - 1))
         local user_tag
         user_tag=$(jq -r --argjson idx "$real_idx" '.[$idx].tag // empty' "$USERS_FILE")
-        local secret
-        secret=$(jq -r --argjson idx "$real_idx" '.[$idx].secret // empty' "$USERS_FILE")
         local username
         username=$(jq -r --argjson idx "$real_idx" '.[$idx].username // empty' "$USERS_FILE")
 
@@ -84,25 +82,6 @@ show_user_links() {
         local server_ip
         server_ip=$(curl -s https://api.ipify.org || hostname -I | awk '{print $1}')
 
-        echo "$nodes_to_show" | while read -r node; do
-            local type=$(echo "$node" | jq -r '.type')
-            local tag=$(echo "$node" | jq -r '.tag')
-            local port=$(echo "$node" | jq -r '.port')
-            
-            if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
-                local sni=$(echo "$node" | jq -r '.sni // .server_name')
-                local public_key=$(echo "$node" | jq -r '.public_key // empty')
-                local short_id=$(echo "$node" | jq -r '.short_id // empty')
-                
-                if [ -z "$user_idx" ]; then
-                    jq -r 'to_entries[] | .value as $u | "\($u.username) (\($u.tag))"' "$USERS_FILE" | while read -r u_info; do
-                        # Hiển thị cho tất cả user nếu để trống
-                        true
-                    done
-                fi
-            fi
-        done
-        
         # Nếu cụ thể 1 user
         if [ -n "$user_idx" ]; then
             local username
@@ -112,22 +91,48 @@ show_user_links() {
             
             echo -e "${BLUE}User: ${GREEN}$username${NC}"
             echo "$nodes_to_show" | while read -r node; do
+                [ -z "$node" ] && continue
                 local type=$(echo "$node" | jq -r '.type')
                 local tag=$(echo "$node" | jq -r '.tag')
                 local port=$(echo "$node" | jq -r '.port')
-                if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
-                    local sni=$(echo "$node" | jq -r '.sni // .server_name')
-                    local public_key=$(echo "$node" | jq -r '.public_key // empty')
-                    local short_id=$(echo "$node" | jq -r '.short_id // empty')
-                    local link
-                    link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                
+                local link=""
+                case "$type" in
+                    "vless-reality"|"vless")
+                        local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
+                        local public_key=$(echo "$node" | jq -r '.public_key // empty')
+                        local short_id=$(echo "$node" | jq -r '.short_id // empty')
+                        link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                        ;;
+                    "vless-grpc-reality")
+                        local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
+                        local public_key=$(echo "$node" | jq -r '.public_key // empty')
+                        local short_id=$(echo "$node" | jq -r '.short_id // empty')
+                        local service_name=$(echo "$node" | jq -r '.grpc_service // empty')
+                        link=$(generate_vless_grpc_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id" "$service_name")
+                        ;;
+                    "vless-ws-tls")
+                        local domain=$(echo "$node" | jq -r '.domain // empty')
+                        local ws_path=$(echo "$node" | jq -r '.ws_path // empty')
+                        link=$(generate_vless_ws_tls_link "$tag" "$server_ip" "$port" "$secret" "$domain" "$ws_path")
+                        ;;
+                    "hysteria2")
+                        local domain=$(echo "$node" | jq -r '.domain // empty')
+                        link=$(generate_hysteria2_link "$tag" "$server_ip" "$port" "$secret" "$domain")
+                        ;;
+                    "tuic")
+                        local domain=$(echo "$node" | jq -r '.domain // empty')
+                        link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$secret" "$domain")
+                        ;;
+                esac
+                
+                if [ -n "$link" ]; then
                     echo -e "$link"
                 fi
             done
         else
             # Tất cả user
             jq -c 'to_entries[]' "$USERS_FILE" | while read -r u_entry; do
-                local u_idx=$(echo "$u_entry" | jq -r '.key')
                 local username=$(echo "$u_entry" | jq -r '.value.username')
                 local secret=$(echo "$u_entry" | jq -r '.value.secret')
                 local u_tag=$(echo "$u_entry" | jq -r '.value.tag')
@@ -141,15 +146,42 @@ show_user_links() {
                 fi
                 
                 echo "$u_nodes" | while read -r node; do
+                    [ -z "$node" ] && continue
                     local type=$(echo "$node" | jq -r '.type')
                     local tag=$(echo "$node" | jq -r '.tag')
                     local port=$(echo "$node" | jq -r '.port')
-                    if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
-                        local sni=$(echo "$node" | jq -r '.sni // .server_name')
-                        local public_key=$(echo "$node" | jq -r '.public_key // empty')
-                        local short_id=$(echo "$node" | jq -r '.short_id // empty')
-                        local link
-                        link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                    
+                    local link=""
+                    case "$type" in
+                        "vless-reality"|"vless")
+                            local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
+                            local public_key=$(echo "$node" | jq -r '.public_key // empty')
+                            local short_id=$(echo "$node" | jq -r '.short_id // empty')
+                            link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                            ;;
+                        "vless-grpc-reality")
+                            local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
+                            local public_key=$(echo "$node" | jq -r '.public_key // empty')
+                            local short_id=$(echo "$node" | jq -r '.short_id // empty')
+                            local service_name=$(echo "$node" | jq -r '.grpc_service // empty')
+                            link=$(generate_vless_grpc_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id" "$service_name")
+                            ;;
+                        "vless-ws-tls")
+                            local domain=$(echo "$node" | jq -r '.domain // empty')
+                            local ws_path=$(echo "$node" | jq -r '.ws_path // empty')
+                            link=$(generate_vless_ws_tls_link "$tag" "$server_ip" "$port" "$secret" "$domain" "$ws_path")
+                            ;;
+                        "hysteria2")
+                            local domain=$(echo "$node" | jq -r '.domain // empty')
+                            link=$(generate_hysteria2_link "$tag" "$server_ip" "$port" "$secret" "$domain")
+                            ;;
+                        "tuic")
+                            local domain=$(echo "$node" | jq -r '.domain // empty')
+                            link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$secret" "$domain")
+                            ;;
+                    esac
+                    
+                    if [ -n "$link" ]; then
                         echo -e "$link"
                     fi
                 done
