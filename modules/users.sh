@@ -43,7 +43,7 @@ show_user_links() {
         return
     fi
     
-    read -p " Nhập số thứ tự user muốn xem link (để trống xem tất cả, 0 để hủy): " user_idx
+    read -p " Nhập số thứ tự user muốn xem link, để trống xem tất cả, 0 để hủy: " user_idx
     if [ "$user_idx" = "0" ]; then
         return
     fi
