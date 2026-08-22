@@ -1,0 +1,5 @@
+# Bỏ qua toàn bộ dữ liệu cấu hình và node của người dùng
+data/
+logs/
+certs/
+core/api_server

@@ -27,13 +27,26 @@ fi
 
 log_info "Đang bắt đầu quá trình cập nhật và khôi phục hệ thống..."
 
-# 2. Cập nhật mã nguồn từ Git (nếu có)
+# 2. Cập nhật mã nguồn từ Git (Có cơ chế bảo vệ thư mục data/ không bị xóa)
 if [ -d "$INSTALL_DIR/.git" ]; then
+    log_info "Đang sao lưu tạm thời dữ liệu người dùng (data/)..."
+    if [ -d "$INSTALL_DIR/data" ]; then
+        rm -rf /tmp/vvc_data_backup
+        cp -r "$INSTALL_DIR/data" /tmp/vvc_data_backup
+    fi
+
     log_info "Đang kéo mã nguồn mới nhất từ GitHub..."
     cd "$INSTALL_DIR"
     git fetch --all
     git reset --hard origin/main || git reset --hard origin/master || true
     git pull || true
+
+    log_info "Đang khôi phục lại dữ liệu người dùng..."
+    if [ -d "/tmp/vvc_data_backup" ]; then
+        mkdir -p "$INSTALL_DIR/data"
+        cp -rf /tmp/vvc_data_backup/* "$INSTALL_DIR/data/"
+        rm -rf /tmp/vvc_data_backup
+    fi
 else
     log_warn "Không phát hiện thư mục Git, bỏ qua bước git pull."
 fi
@@ -127,5 +140,6 @@ chmod +x /usr/local/bin/vvc
 log_success "=================================================="
 log_success " CẬP NHẬT HOÀN TẤT!"
 log_success " Tất cả tệp bị thiếu đã được khôi phục."
+log_success " Dữ liệu node và user của bạn được bảo vệ an toàn."
 log_success " Menu điều khiển (vvc) đã được cập nhật thay đổi ngay lập tức."
 log_success "=================================================="
