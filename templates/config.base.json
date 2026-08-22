@@ -45,9 +45,7 @@
         "outbound": "dns-remote"
       },
       {
-        "ip_cidr": [
-          "geoip:private"
-        ],
+        "ip_is_private": true,
         "outbound": "block"
       }
     ],
