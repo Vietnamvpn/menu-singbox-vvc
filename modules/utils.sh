@@ -498,6 +498,8 @@ build_and_apply_config() {
         users: (if ($matched_users | length) > 0 then [$matched_users[] | {uuid: .secret, password: $n.password}] else [{uuid: $n.uuid, password: $n.password}] end),
         tls: {
             enabled: true,
+            server_name: $n.domain,
+            alpn: ["h3"],
             certificate_path: $n.cert_path,
             key_path: $n.key_path
         }
