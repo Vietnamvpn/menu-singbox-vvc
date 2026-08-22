@@ -122,7 +122,8 @@ show_user_links() {
                         ;;
                     "tuic")
                         local domain=$(echo "$node" | jq -r '.domain // empty')
-                        link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$secret" "$domain")
+                        local password=$(echo "$node" | jq -r '.password // empty')
+                        link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$password" "$domain")
                         ;;
                 esac
                 
@@ -177,7 +178,8 @@ show_user_links() {
                             ;;
                         "tuic")
                             local domain=$(echo "$node" | jq -r '.domain // empty')
-                            link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$secret" "$domain")
+                            local password=$(echo "$node" | jq -r '.password // empty')
+                            link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$password" "$domain")
                             ;;
                     esac
                     
