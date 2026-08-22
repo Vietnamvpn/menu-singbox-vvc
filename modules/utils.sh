@@ -534,3 +534,29 @@ build_and_apply_config() {
         log_error "Biên dịch thất bại! Lỗi cú pháp JSON."
     fi
 }
+
+# ==========================================
+# HÀM RÁP LINK CHIA SẺ CHO APP (VLESS REALITY)
+# ==========================================
+
+generate_vless_reality_link() {
+    local tag="$1"
+    local address="$2"
+    local port="$3"
+    local uuid="$4"
+    local sni="$5"
+    local private_key="$6"
+    local short_id="$7"
+    
+    # Trích xuất Public Key từ Private Key của Reality bằng sing-box core
+    local public_key
+    public_key=$(sing-box x25519 "$private_key" 2>/dev/null | grep -i "Public" | awk '{print $3}')
+    if [ -z "$public_key" ]; then
+        public_key=""
+    fi
+
+    # Ráp link chuẩn VLESS Reality cho app
+    local link="vless://${uuid}@${address}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni}&fp=chrome&pbk=${public_key}&sid=${short_id}&type=tcp#${tag}"
+    
+    echo "$link"
+}

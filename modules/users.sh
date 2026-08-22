@@ -24,14 +24,84 @@ list_users() {
     
     if [ ! -s "$USERS_FILE" ] || [ "$(cat "$USERS_FILE")" = "[]" ]; then
         echo -e "${YELLOW}Chưa có user nào được tạo.${NC}"
+        echo -e "${CYAN}================================================================${NC}"
+        return 1
     else
         if command -v jq &> /dev/null; then
-            jq -r '.[] | "User: \(.username) │ Node Tag: \(.tag) │ Pass/UUID: \(.secret)"' "$USERS_FILE"
+            jq -r 'to_entries[] | "\(.key + 1). User: \(.value.username) │ Pass/UUID: \(.value.secret)"' "$USERS_FILE"
         else
             cat "$USERS_FILE"
         fi
     fi
     echo -e "${CYAN}================================================================${NC}"
+    return 0
+}
+
+show_user_links() {
+    if ! list_users; then
+        sleep 2
+        return
+    fi
+    
+    read -p " Nhập số thứ tự user muốn xem link (hoặc để trống để quay lại): " user_idx
+    if [ -z "$user_idx" ]; then
+        return
+    fi
+
+    local real_idx=$((user_idx - 1))
+    local username
+    local secret
+    local user_tag
+    
+    username=$(jq -r --argjson idx "$real_idx" '.[$idx].username // empty' "$USERS_FILE")
+    secret=$(jq -r --argjson idx "$real_idx" '.[$idx].secret // empty' "$USERS_FILE")
+    user_tag=$(jq -r --argjson idx "$real_idx" '.[$idx].tag // empty' "$USERS_FILE")
+
+    if [ -z "$username" ]; then
+        echo -e "${RED}Lỗi: Số thứ tự user không hợp lệ!${NC}"
+        sleep 2
+        return
+    fi
+
+    clear
+    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}           LINK KẾT NỐI CHO USER: ${GREEN}$username${NC}"
+    echo -e "${CYAN}================================================================${NC}"
+
+    local nodes_to_show
+    if [ "$user_tag" = "all" ]; then
+        nodes_to_show=$(jq -c '.[]' "$NODES_FILE")
+    else
+        nodes_to_show=$(jq -c --arg tag "$user_tag" '.[] | select(.tag == $tag)' "$NODES_FILE")
+    fi
+
+    if [ -z "$nodes_to_show" ]; then
+        echo -e "${YELLOW}Không tìm thấy node nào phù hợp cho user này.${NC}"
+    else
+        local server_ip
+        server_ip=$(curl -s https://api.ipify.org || hostname -I | awk '{print $1}')
+
+        echo "$nodes_to_show" | while read -r node; do
+            local type=$(echo "$node" | jq -r '.type')
+            local tag=$(echo "$node" | jq -r '.tag')
+            local port=$(echo "$node" | jq -r '.port')
+            
+            if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
+                local sni=$(echo "$node" | jq -r '.sni // .server_name')
+                local private_key=$(echo "$node" | jq -r '.private_key')
+                local short_id=$(echo "$node" | jq -r '.short_id[0]')
+                
+                local link
+                link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$private_key" "$short_id")
+                echo -e "${GREEN}Node (${tag}):${NC}"
+                echo -e "$link\n"
+            else
+                echo -e "${YELLOW}Node (${tag}) - Loại ${type} chưa hỗ trợ hiển thị link tự động.${NC}"
+            fi
+        done
+    fi
+    echo -e "${CYAN}================================================================${NC}"
+    read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
 }
 
 add_user() {
@@ -46,18 +116,31 @@ add_user() {
         return
     fi
 
+    echo -e "${GREEN}Danh sách các giao thức/node hiện có:${NC}"
+    local node_list=()
     if command -v jq &> /dev/null; then
-        echo -e "${GREEN}Các Node hiện có:${NC}"
-        jq -r '.[] | " - Tag: \(.tag) (Type: \(.type))"' "$NODES_FILE"
+        local i=1
+        while read -r tag && read -r type; do
+            echo -e " ${GREEN}$i.${NC} Tag: $tag (Type: $type)"
+            node_list+=("$tag")
+            i=$((i + 1))
+        done < <(jq -r '.[] | .tag, .type' "$NODES_FILE")
     fi
+    echo -e " ${GREEN}0.${NC} Gán vào tất cả các node"
+    echo -e "${CYAN}================================================================${NC}"
 
-    read -p " Nhập Tag của node muốn thêm user: " target_tag
-    if [ -z "$target_tag" ]; then return; fi
+    read -p " Nhập số thứ tự node muốn gán (để trống hoặc nhập 0 để gán tất cả): " node_choice
 
-    if ! grep -q "\"tag\": \"$target_tag\"" "$NODES_FILE" 2>/dev/null; then
-        echo -e "${RED}Lỗi: Không tìm thấy node với tag '$target_tag'!${NC}"
-        sleep 2
-        return
+    local target_tag="all"
+    if [ -n "$node_choice" ] && [ "$node_choice" -ne 0 ]; then
+        local idx=$((node_choice - 1))
+        if [ $idx -ge 0 ] && [ $idx -lt ${#node_list[@]} ]; then
+            target_tag="${node_list[$idx]}"
+        else
+            echo -e "${RED}Lựa chọn không hợp lệ, mặc định gán vào tất cả các node!${NC}"
+            target_tag="all"
+            sleep 2
+        fi
     fi
 
     read -p " Nhập tên User (Username): " username
@@ -149,7 +232,7 @@ while true; do
     echo -e "${CYAN}================================================================${NC}"
     echo -e "${BLUE}                     QUẢN LÝ THÔNG TIN USER                   ${NC}"
     echo -e "${CYAN}================================================================${NC}"
-    echo -e " ${GREEN}1.${NC} Hiển thị danh sách User"
+    echo -e " ${GREEN}1.${NC} Hiển thị danh sách User & Xem Link"
     echo -e " ${GREEN}2.${NC} Thêm User mới"
     echo -e " ${GREEN}3.${NC} Xóa User"
     echo -e " ${GREEN}4.${NC} Reset Token User"
@@ -159,8 +242,7 @@ while true; do
 
     case $choice in
         1)
-            list_users
-            read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
+            show_user_links
             ;;
         2)
             add_user
