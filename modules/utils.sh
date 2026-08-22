@@ -403,16 +403,98 @@ build_and_apply_config() {
 
     log_info "Đang tổng hợp nodes và users vào cấu hình..."
     
-    # 3. Sử dụng jq với --slurpfile để kết hợp base_config, nodes.json và users.json
+    # 3. Sử dụng jq với --slurpfile để kết hợp base_config, nodes.json và users.json 
+    # và tái cấu trúc (map) thành định dạng chuẩn Sing-box cho từng giao thức.
     if jq --slurpfile nodes "$nodes_file" --slurpfile users "$users_file" '
         .inbounds = [
-            ($nodes[0][]? | . as $node | 
-                $node + {
-                    type: (if ($node.type | startswith("vless-")) then "vless" else $node.type end),
-                    users: [
-                        ($users[0][]? | select(.tag == $node.tag) | {uuid: .secret, name: .username})
-                    ]
-                }
+            ($nodes[0][]? | . as $n | 
+                ([$users[0][]? | select(.tag == $n.tag)]) as $matched_users |
+                ([$matched_users[] | {uuid: .secret, name: .username}]) as $vless_users |
+                
+                if $n.type == "vless-reality" then
+                    {
+                        type: "vless",
+                        tag: $n.tag,
+                        listen_port: $n.port,
+                        users: $vless_users,
+                        tls: {
+                            enabled: true,
+                            server_name: $n.sni,
+                            reality: {
+                                enabled: true,
+                                handshake: { server: $n.sni },
+                                private_key: $n.private_key,
+                                short_id: [$n.short_id]
+                            }
+                        }
+                    }
+                elif $n.type == "vless-ws-tls" then
+                    {
+                        type: "vless",
+                        tag: $n.tag,
+                        listen_port: $n.port,
+                        users: $vless_users,
+                        tls: {
+                            enabled: true,
+                            server_name: $n.domain,
+                            certificate_path: $n.cert_path,
+                            key_path: $n.key_path
+                        },
+                        transport: {
+                            type: "ws",
+                            path: $n.ws_path
+                        }
+                    }
+                elif $n.type == "vless-grpc-reality" then
+                    {
+                        type: "vless",
+                        tag: $n.tag,
+                        listen_port: $n.port,
+                        users: $vless_users,
+                        tls: {
+                            enabled: true,
+                            server_name: $n.sni,
+                            reality: {
+                                enabled: true,
+                                handshake: { server: $n.sni },
+                                private_key: $n.private_key,
+                                short_id: [$n.short_id]
+                            }
+                        },
+                        transport: {
+                            type: "grpc",
+                            service_name: $n.grpc_service
+                        }
+                    }
+                elif $n.type == "hysteria2" then
+                    {
+                        type: "hysteria2",
+                        tag: $n.tag,
+                        listen_port: $n.port,
+                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {password: .secret, name: .username}] else [{password: $n.password}] end),
+                        up_mbps: ($n.up_mbps | tonumber),
+                        down_mbps: ($n.down_mbps | tonumber),
+                        tls: {
+                            enabled: true,
+                            certificate_path: $n.cert_path,
+                            key_path: $n.key_path
+                        }
+                    }
+                elif $n.type == "tuic" then
+                    {
+                        type: "tuic",
+                        tag: $n.tag,
+                        listen_port: $n.port,
+                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {uuid: .secret, password: .secret, name: .username}] else [{uuid: $n.uuid, password: $n.password}] end),
+                        tls: {
+                            enabled: true,
+                            certificate_path: $n.cert_path,
+                            key_path: $n.key_path
+                        }
+                    }
+                else
+                    empty
+                end
             )
         ]
     ' "$base_config" > "${dest_config}.tmp"; then
