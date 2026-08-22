@@ -5,7 +5,7 @@ NODES_FILE="$INSTALL_DIR/data/nodes.json"
 USERS_FILE="$INSTALL_DIR/data/users.json"
 mkdir -p "$INSTALL_DIR/data"
 
-if [ ! -f "$USERS_FILE" ]; then
+if [ ! -s "$USERS_FILE" ]; then
     echo "[]" > "$USERS_FILE"
 fi
 
@@ -76,16 +76,18 @@ add_user() {
     local secret=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
     echo -e "${GREEN} -> Đã tự động tạo secret cho user: $secret${NC}"
 
-    jq --arg username "$username" \
+    if jq --arg username "$username" \
        --arg tag "$target_tag" \
        --arg secret "$secret" \
        '. += [{
            "username": $username,
            "tag": $tag,
            "secret": $secret
-       }]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
-
-    echo -e "${GREEN}Thêm User thành công!${NC}"
+       }]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"; then
+        echo -e "${GREEN}Thêm User thành công!${NC}"
+    else
+        echo -e "${RED}Lỗi: Không thể ghi dữ liệu vào tệp users.json!${NC}"
+    fi
     sleep 2
 }
 
