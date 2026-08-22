@@ -56,7 +56,6 @@ log_info "Đang kiểm tra cấu trúc thư mục..."
 DIRS=(
     "$INSTALL_DIR/core"
     "$INSTALL_DIR/modules"
-    "$INSTALL_DIR/cron"
     "$INSTALL_DIR/data"
     "$INSTALL_DIR/certs/default"
     "$INSTALL_DIR/logs"
