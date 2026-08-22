@@ -159,15 +159,20 @@ check_tag_exists() {
 # CÁC HÀM AUTO-GENERATE (KHÔNG CẦN FORM NHẬP)
 # ====================================================================
 
+# Sửa hàm sinh Key: Bắt mọi định dạng chữ và chuẩn hóa fallback x25519
 AUTO_PK=""
 generate_private_key() {
     if command -v sing-box &> /dev/null; then
         local kp=$(sing-box generate reality-keypair)
-        AUTO_PK=$(echo "$kp" | grep "PrivateKey" | awk '{print $2}')
-    else
-        AUTO_PK=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 43)
+        # Sử dụng grep -iE và awk để xử lý linh hoạt khoảng trắng
+        AUTO_PK=$(echo "$kp" | grep -iE "private" | awk -F':' '{print $2}' | tr -d ' \r\n')
     fi
-    echo -e "${GREEN} -> Đã tự động tạo Private Key.${NC}"
+    
+    # Nếu biến trống do lỗi hệ thống -> Tạo base64url đúng chuẩn 43 ký tự
+    if [ -z "$AUTO_PK" ]; then
+        AUTO_PK=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | head -c 43)
+    fi
+    echo -e "${GREEN} -> Đã tự động tạo Private Key: $AUTO_PK${NC}"
 }
 
 AUTO_SHORT_ID=""
@@ -225,8 +230,14 @@ form_vless_reality() {
     echo -e "${BLUE}             THÊM NODE: VLESS REALITY (TCP)                    ${NC}"
     echo -e "${CYAN}================================================================${NC}"
     
+    # Chốt chặn an toàn định dạng JSON
+    if [ ! -s "$NODES_FILE" ] || ! jq -e . "$NODES_FILE" >/dev/null 2>&1; then
+        echo "[]" > "$NODES_FILE"
+    fi
+
     ask_port
     ask_sni
+    ask_domain
     ask_tag "vless-reality"
     
     check_tag_exists || return
@@ -237,6 +248,7 @@ form_vless_reality() {
     jq --arg tag "$ASKED_TAG" \
        --arg type "vless-reality" \
        --argjson port "$ASKED_PORT" \
+       --arg domain "$ASKED_DOMAIN" \
        --arg sni "$ASKED_SNI" \
        --arg private_key "$AUTO_PK" \
        --arg short_id "$AUTO_SHORT_ID" \
@@ -244,6 +256,7 @@ form_vless_reality() {
            "tag": $tag,
            "type": $type,
            "port": $port,
+           "domain": $domain,
            "sni": $sni,
            "private_key": $private_key,
            "short_id": $short_id
