@@ -88,11 +88,11 @@ show_user_links() {
             
             if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
                 local sni=$(echo "$node" | jq -r '.sni // .server_name')
-                local private_key=$(echo "$node" | jq -r '.private_key')
-                local short_id=$(echo "$node" | jq -r '.short_id[0]')
+                local public_key=$(echo "$node" | jq -r '.public_key // empty')
+                local short_id=$(echo "$node" | jq -r '.short_id // empty')
                 
                 local link
-                link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$private_key" "$short_id")
+                link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
                 echo -e "${GREEN}Node (${tag}):${NC}"
                 echo -e "$link\n"
             else
@@ -236,7 +236,7 @@ while true; do
     echo -e " ${GREEN}2.${NC} Thêm User mới"
     echo -e " ${GREEN}3.${NC} Xóa User"
     echo -e " ${GREEN}4.${NC} Reset Token User"
-    echo -e " ${RED}0.${NC} Quay lại Menu chính"
+    echo -e "${RED}0.${NC} Quay lại Menu chính"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn chức năng [0-4]: " choice
 
