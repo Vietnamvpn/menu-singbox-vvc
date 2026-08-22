@@ -19,19 +19,14 @@
         "detour": "direct"
       }
     ],
-    "rules": [
-      {
-        "outbound": "any",
-        "server": "dns-local"
-      }
-    ],
     "independent_cache": true
   },
   "inbounds": [],
   "outbounds": [
     {
       "type": "direct",
-      "tag": "direct"
+      "tag": "direct",
+      "domain_resolver": "dns-local"
     },
     {
       "type": "block",
