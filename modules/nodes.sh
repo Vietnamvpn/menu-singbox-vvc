@@ -432,7 +432,6 @@ form_tuic() {
 ADDED_NODE_TAGS=()
 
 handle_node_user_assignment_and_build() {
-    # 1. Kiểm tra nếu chưa có user nào thì tự động tạo mặc định admin
     if [ ! -s "$USERS_FILE" ] || [ "$(cat "$USERS_FILE")" = "[]" ]; then
         echo -e "${YELLOW}Hệ thống chưa có user nào. Đang tự động tạo user mặc định 'admin'...${NC}"
         local admin_secret=""
@@ -449,7 +448,6 @@ handle_node_user_assignment_and_build() {
         echo -e "${GREEN} -> Đã tạo user 'admin' thành công (UUID: $admin_secret).${NC}"
     fi
 
-    # 2. Hiển thị danh sách user đang có để chọn
     clear
     echo -e "${CYAN}================================================================${NC}"
     echo -e "${BLUE}                    CHỌN USER ĐỂ GÁN NODE                      ${NC}"
@@ -493,8 +491,6 @@ handle_node_user_assignment_and_build() {
     fi
 
     ADDED_NODE_TAGS=()
-
-    # 3. Gọi hàm biên dịch và áp dụng cấu hình cuối cùng
     build_and_apply_config
     sleep 2
 }
@@ -554,7 +550,6 @@ add_node_menu() {
                 ;;
         esac
 
-        # Hỏi có muốn tiếp tục thêm giao thức nữa không
         read -p " Bạn có muốn thêm giao thức nữa không? (y/n): " add_more
         if [[ "$add_more" =~ ^[Nn]$ ]]; then
             handle_node_user_assignment_and_build
@@ -571,24 +566,37 @@ list_nodes() {
     
     if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
         echo -e "${YELLOW}Chưa có node nào được tạo.${NC}"
+        echo -e "${CYAN}================================================================${NC}"
+        return 1
     else
         if command -v jq &> /dev/null; then
-            jq -r '.[] | "Tag: \(.tag) │ Type: \(.type) │ Port: \(.port) │ Domain/SNI: \(.sni // .domain // "N/A")"' "$NODES_FILE"
+            jq -r 'to_entries[] | "\(.key + 1). Tag: \(.value.tag) │ Type: \(.value.type) │ Port: \(.value.port)\n    Domain: \(.value.domain // "N/A") │ SNI: \(.value.sni // "N/A")"' "$NODES_FILE"
         else
             cat "$NODES_FILE"
         fi
     fi
     echo -e "${CYAN}================================================================${NC}"
+    return 0
 }
 
 update_node() {
     clear
-    list_nodes
-    read -p " Nhập Tag của node cần cập nhật: " node_tag
-    if [ -z "$node_tag" ]; then return; fi
+    if ! list_nodes; then
+        sleep 2
+        return
+    fi
+    
+    read -p " Nhập số thứ tự node cần cập nhật, 0 để hủy: " node_idx
+    if [ -z "$node_idx" ] || [ "$node_idx" -eq 0 ]; then
+        return
+    fi
 
-    if ! grep -q "\"tag\": \"$node_tag\"" "$NODES_FILE" 2>/dev/null; then
-        echo -e "${RED}Lỗi: Không tìm thấy node với tag '$node_tag'!${NC}"
+    local real_idx=$((node_idx - 1))
+    local node_tag
+    node_tag=$(jq -r --argjson idx "$real_idx" '.[$idx].tag // empty' "$NODES_FILE")
+
+    if [ -z "$node_tag" ]; then
+        echo -e "${RED}Lỗi: Số thứ tự node không hợp lệ!${NC}"
         sleep 2
         return
     fi
@@ -625,9 +633,25 @@ update_node() {
 
 delete_node() {
     clear
-    list_nodes
-    read -p " Nhập Tag của node cần xóa: " node_tag
-    if [ -z "$node_tag" ]; then return; fi
+    if ! list_nodes; then
+        sleep 2
+        return
+    fi
+    
+    read -p " Nhập số thứ tự node cần xóa, 0 để hủy: " node_idx
+    if [ -z "$node_idx" ] || [ "$node_idx" -eq 0 ]; then
+        return
+    fi
+
+    local real_idx=$((node_idx - 1))
+    local node_tag
+    node_tag=$(jq -r --argjson idx "$real_idx" '.[$idx].tag // empty' "$NODES_FILE")
+
+    if [ -z "$node_tag" ]; then
+        echo -e "${RED}Lỗi: Số thứ tự node không hợp lệ!${NC}"
+        sleep 2
+        return
+    fi
 
     if command -v jq &> /dev/null; then
         jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
