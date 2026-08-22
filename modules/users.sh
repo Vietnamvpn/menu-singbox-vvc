@@ -185,7 +185,7 @@ add_user() {
     echo -e " ${RED}0.${NC} Hủy bỏ / Quay lại"
     echo -e "${CYAN}================================================================${NC}"
 
-    read -p " Nhập số thứ tự node muốn gán (để trống gán tất cả, 0 để hủy): " node_choice
+    read -p " Nhập số thứ tự node muốn gán, để trống gán tất cả: " node_choice
 
     if [ "$node_choice" = "0" ]; then
         return
@@ -203,7 +203,7 @@ add_user() {
         fi
     fi
 
-    read -p " Nhập tên User (Username) (0 để hủy): " username
+    read -p " Nhập tên User, 0 để hủy: " username
     if [ "$username" = "0" ] || [ -z "$username" ]; then
         return
     fi
@@ -245,7 +245,7 @@ delete_user() {
         return
     fi
     
-    read -p " Nhập số thứ tự user cần xóa (để trống xóa tất cả, 0 để hủy): " user_choice
+    read -p " Nhập số thứ tự user cần xóa, để trống xóa tất cả, 0 để hủy: " user_choice
     if [ "$user_choice" = "0" ]; then
         return
     fi
@@ -286,7 +286,7 @@ reset_user_token() {
         return
     fi
     
-    read -p " Nhập số thứ tự user cần reset token (để trống reset tất cả, 0 để hủy): " user_choice
+    read -p " Nhập số thứ tự user cần reset token, để trống reset tất cả, 0 để hủy: " user_choice
     if [ "$user_choice" = "0" ]; then
         return
     fi
@@ -335,7 +335,7 @@ while true; do
     echo -e " ${GREEN}2.${NC} Thêm User Mới"
     echo -e " ${GREEN}3.${NC} Xóa User"
     echo -e " ${GREEN}4.${NC} Reset Token User"
-    echo -e "${RED}0.${NC} Quay Lại Menu Chính"
+    echo -e " ${RED}0.${NC} Quay Lại Menu Chính"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn chức năng [0-4]: " choice
 
