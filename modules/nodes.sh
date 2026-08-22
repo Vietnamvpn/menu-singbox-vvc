@@ -105,18 +105,14 @@ ask_sni() {
     fi
 }
 
-# 3. Form nhập Domain (Linh hoạt lấy theo IP, Port, SNI nếu trống)
+# 3. Form nhập Domain (Lấy IP VPS nếu để trống)
 ASKED_DOMAIN=""
 ask_domain() {
-    read -p " Nhập Tên miền (Domain) [Để trống = tự tạo theo IP/SNI]: " ASKED_DOMAIN
+    read -p " Nhập Tên miền (Domain) [Để trống = lấy IP VPS]: " ASKED_DOMAIN
     if [ -z "$ASKED_DOMAIN" ]; then
         local ip=$(curl -s4 ifconfig.me || echo "127.0.0.1")
-        if [ -n "$ASKED_SNI" ]; then
-            ASKED_DOMAIN="$ASKED_SNI"
-        else
-            ASKED_DOMAIN="${ip}.nip.io"
-        fi
-        echo -e "${GREEN} -> Đã tạo Domain tự động: $ASKED_DOMAIN${NC}"
+        ASKED_DOMAIN="$ip"
+        echo -e "${GREEN} -> Đã tự động lấy Domain theo IP VPS: $ASKED_DOMAIN${NC}"
     fi
 }
 
