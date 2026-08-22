@@ -173,16 +173,23 @@ check_tag_exists() {
 # ====================================================================
 
 AUTO_PK=""
+AUTO_PUBK=""
 generate_private_key() {
     if command -v sing-box &> /dev/null; then
         local kp=$(sing-box generate reality-keypair)
         AUTO_PK=$(echo "$kp" | grep -iE "private" | awk -F':' '{print $2}' | tr -d ' \r\n')
+        AUTO_PUBK=$(echo "$kp" | grep -iE "public" | awk -F':' '{print $2}' | tr -d ' \r\n')
     fi
     
     if [ -z "$AUTO_PK" ]; then
         AUTO_PK=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | head -c 43)
     fi
-    echo -e "${GREEN} -> Đã tự động tạo Private Key: $AUTO_PK${NC}"
+
+    if [ -z "$AUTO_PUBK" ] && command -v sing-box &> /dev/null; then
+        AUTO_PUBK=$(sing-box x25519 "$AUTO_PK" 2>/dev/null | grep -i "Public" | awk '{print $NF}')
+    fi
+    
+    echo -e "${GREEN} -> Đã tự động tạo Reality Keypair thành công.${NC}"
 }
 
 AUTO_SHORT_ID=""
@@ -260,6 +267,7 @@ form_vless_reality() {
        --arg domain "$ASKED_DOMAIN" \
        --arg sni "$ASKED_SNI" \
        --arg private_key "$AUTO_PK" \
+       --arg public_key "$AUTO_PUBK" \
        --arg short_id "$AUTO_SHORT_ID" \
        '. += [{
            "tag": $tag,
@@ -268,6 +276,7 @@ form_vless_reality() {
            "domain": $domain,
            "sni": $sni,
            "private_key": $private_key,
+           "public_key": $public_key,
            "short_id": $short_id
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
@@ -344,6 +353,7 @@ form_vless_grpc_reality() {
        --arg grpc_service "$auto_grpc" \
        --arg sni "$ASKED_SNI" \
        --arg private_key "$AUTO_PK" \
+       --arg public_key "$AUTO_PUBK" \
        --arg short_id "$AUTO_SHORT_ID" \
        '. += [{
            "tag": $tag,
@@ -352,6 +362,7 @@ form_vless_grpc_reality() {
            "grpc_service": $grpc_service,
            "sni": $sni,
            "private_key": $private_key,
+           "public_key": $public_key,
            "short_id": $short_id
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
