@@ -375,10 +375,6 @@ extract_json_block() {
 # HÀM BIÊN DỊCH VÀ ÁP DỤNG CẤU HÌNH (BUILD)
 # ==========================================
 
-# ==========================================
-# HÀM BIÊN DỊCH VÀ ÁP DỤNG CẤU HÌNH (BUILD)
-# ==========================================
-
 build_and_apply_config() {
     log_info "Đang tiến hành biên dịch cấu hình Sing-box..."
     
@@ -408,11 +404,11 @@ build_and_apply_config() {
     log_info "Đang tổng hợp nodes và users vào cấu hình..."
     
     # 3. Sử dụng jq với --slurpfile để kết hợp base_config, nodes.json và users.json 
-    # và tái cấu trúc khớp hoàn toàn với template vless-reality.json.
+    # Đã bổ sung điều kiện lọc user có tag khớp với node hoặc tag == "all"
     if jq --slurpfile nodes "$nodes_file" --slurpfile users "$users_file" '
         .inbounds = [
             ($nodes[0][]? | . as $n | 
-                ([$users[0][]? | select(.tag == $n.tag)]) as $matched_users |
+                ([$users[0][]? | select(.tag == $n.tag or .tag == "all")]) as $matched_users |
                 ([$matched_users[] | {uuid: .secret, flow: "xtls-rprx-vision"}]) as $vless_users |
                 
                 if $n.type == "vless-reality" then
