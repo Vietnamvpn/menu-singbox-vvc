@@ -93,7 +93,7 @@ show_menu() {
     show_banner
     echo -e " ${GREEN}1.${NC} Quản Lý Node             ${CYAN}│${NC}  ${GREEN}2.${NC} Quản Lý Routing & Relay"
     echo -e " ${GREEN}3.${NC} Quản Lý Người Dùng       ${CYAN}│${NC}  ${GREEN}4.${NC} Quản Lý Chứng Chỉ SSL"
-    echo -e " ${GREEN}5.${NC} Quản Lý Sing Box    ${CYAN}│${NC}  ${GREEN}6.${NC} API Web Trung Tâm"
+    echo -e " ${GREEN}5.${NC} Quản Lý Sing Box         ${CYAN}│${NC}  ${GREEN}6.${NC} API Web Trung Tâm"
     echo -e " ${GREEN}7.${NC} Kích Hoạt BBR & Thêm Swap${CYAN}│${NC}  ${GREEN}8.${NC} Cập Nhật Hệ Thống"
     echo -e " ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn          ${CYAN}│${NC}  ${RED}0.${NC} Thoát Khỏi Menu"
     echo -e "${CYAN}================================================================${NC}"
