@@ -1,12 +1,16 @@
 #!/bin/bash
 
-# Khai báo đường dẫn gốc chính xác
 INSTALL_DIR="/opt/menu-singbox-vvc"
 NODES_FILE="$INSTALL_DIR/data/nodes.json"
+DOMAIN_FILE="$INSTALL_DIR/data/domain.json"
 mkdir -p "$INSTALL_DIR/data"
 
 if [ ! -f "$NODES_FILE" ]; then
     echo "[]" > "$NODES_FILE"
+fi
+
+if [ ! -f "$DOMAIN_FILE" ]; then
+    echo "[]" > "$DOMAIN_FILE"
 fi
 
 # Nhúng màu sắc và các hàm tiện ích dùng chung từ utils.sh
@@ -71,6 +75,19 @@ open_firewall_port() {
         firewall-cmd --reload >/dev/null 2>&1
     fi
     echo -e "${GREEN} -> Đã mở port $port thành công.${NC}"
+}
+
+save_domain_mapping() {
+    local tag=$1
+    local domain=$2
+    if [ -n "$tag" ] && [ -n "$domain" ]; then
+        if [ ! -s "$DOMAIN_FILE" ] || ! jq -e . "$DOMAIN_FILE" >/dev/null 2>&1; then
+            echo "[]" > "$DOMAIN_FILE"
+        fi
+        jq --arg tag "$tag" --arg domain "$domain" \
+           '[.[] | select(.tag != $tag)] + [{"tag": $tag, "domain": $domain}]' \
+           "$DOMAIN_FILE" > "$DOMAIN_FILE.tmp" && mv "$DOMAIN_FILE.tmp" "$DOMAIN_FILE"
+    fi
 }
 
 # 1. Form nhập Port
@@ -258,6 +275,9 @@ form_vless_reality() {
            "short_id": $short_id
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
+    # Lưu riêng domain vào domain.json
+    save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
+
     echo -e "${GREEN}Thêm Node VLESS REALITY thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
 }
@@ -295,6 +315,9 @@ form_vless_ws_tls() {
            "cert_path": $cert_path,
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
+
+    # Lưu riêng domain vào domain.json
+    save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node VLESS WS TLS thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
@@ -380,6 +403,9 @@ form_hy2() {
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
+    # Lưu riêng domain vào domain.json
+    save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
+
     echo -e "${GREEN}Thêm Node Hysteria 2 thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
 }
@@ -419,6 +445,9 @@ form_tuic() {
            "cert_path": $cert_path,
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
+
+    # Lưu riêng domain vào domain.json
+    save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node TUIC thành công! Tag: $ASKED_TAG${NC}"
     sleep 2
