@@ -90,13 +90,13 @@ mkdir -p "$INSTALL_DIR"/templates/vless
 
 # 5. Khởi tạo Dữ liệu trạng thái ban đầu trong data/
 log_info "Khởi tạo các tệp dữ liệu tĩnh..."
-[ ! -f "$INSTALL_DIR/data/nodes.json" ] && echo "[]" > "$INSTALL_DIR/data/nodes.json"
-[ ! -f "$INSTALL_DIR/data/users.json" ] && echo "[]" > "$INSTALL_DIR/data/users.json"
-[ ! -f "$INSTALL_DIR/data/outbound.json" ] && echo "[]" > "$INSTALL_DIR/data/outbound.json"
-[ ! -f "$INSTALL_DIR/data/routing.json" ] && echo "[]" > "$INSTALL_DIR/data/routing.json"
-[ ! -f "$INSTALL_DIR/data/domain.json" ] && echo "[]" > "$INSTALL_DIR/data/domain.json"
-[ ! -f "$INSTALL_DIR/data/entry-node.json" ] && echo "[]" > "$INSTALL_DIR/data/entry-node.json"
-[ ! -f "$INSTALL_DIR/data/local_state.json" ] && echo "{}" > "$INSTALL_DIR/data/local_state.json"
+[ ! -s "$INSTALL_DIR/data/nodes.json" ] && echo "[]" > "$INSTALL_DIR/data/nodes.json"
+[ ! -s "$INSTALL_DIR/data/users.json" ] && echo "[]" > "$INSTALL_DIR/data/users.json"
+[ ! -s "$INSTALL_DIR/data/outbound.json" ] && echo "[]" > "$INSTALL_DIR/data/outbound.json"
+[ ! -s "$INSTALL_DIR/data/routing.json" ] && echo "[]" > "$INSTALL_DIR/data/routing.json"
+[ ! -s "$INSTALL_DIR/data/domain.json" ] && echo "[]" > "$INSTALL_DIR/data/domain.json"
+[ ! -s "$INSTALL_DIR/data/entry-node.json" ] && echo "[]" > "$INSTALL_DIR/data/entry-node.json"
+[ ! -s "$INSTALL_DIR/data/local_state.json" ] && echo "{}" > "$INSTALL_DIR/data/local_state.json"
 
 # 6. Khởi tạo Chứng chỉ SSL tạm thời (Self-Signed) khi chưa xin từ Cloudflare
 if [ ! -f "$INSTALL_DIR/certs/default/cert.pem" ]; then

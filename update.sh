@@ -70,7 +70,7 @@ for dir in "${DIRS[@]}"; do
     fi
 done
 
-# 4. Kiểm tra và tự động khôi phục các tệp JSON dữ liệu bị thiếu
+# 4. Kiểm tra và tự động khôi phục các tệp JSON dữ liệu bị thiếu hoặc rỗng
 log_info "Đang kiểm tra các tệp dữ liệu trong data/..."
 declare -A DATA_FILES=(
     ["$INSTALL_DIR/data/nodes.json"]="[]"
@@ -83,8 +83,8 @@ declare -A DATA_FILES=(
 )
 
 for file in "${!DATA_FILES[@]}"; do
-    if [ ! -f "$file" ]; then
-        log_warn "Tệp dữ liệu bị thiếu: $file -> Đang khởi tạo lại..."
+    if [ ! -s "$file" ]; then
+        log_warn "Tệp dữ liệu bị thiếu hoặc rỗng: $file -> Đang khởi tạo lại..."
         echo "${DATA_FILES[$file]}" > "$file"
     fi
 done
