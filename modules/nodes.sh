@@ -274,6 +274,7 @@ form_vless_reality() {
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node VLESS REALITY thành công! Tag: $ASKED_TAG${NC}"
+    build_and_apply_config
     sleep 2
 }
 
@@ -314,6 +315,7 @@ form_vless_ws_tls() {
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node VLESS WS TLS thành công! Tag: $ASKED_TAG${NC}"
+    build_and_apply_config
     sleep 2
 }
 
@@ -354,6 +356,7 @@ form_vless_grpc_reality() {
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
     echo -e "${GREEN}Thêm Node VLESS gRPC REALITY thành công! Tag: $ASKED_TAG${NC}"
+    build_and_apply_config
     sleep 2
 }
 
@@ -400,6 +403,7 @@ form_hy2() {
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node Hysteria 2 thành công! Tag: $ASKED_TAG${NC}"
+    build_and_apply_config
     sleep 2
 }
 
@@ -442,6 +446,7 @@ form_tuic() {
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node TUIC thành công! Tag: $ASKED_TAG${NC}"
+    build_and_apply_config
     sleep 2
 }
 
@@ -512,6 +517,7 @@ update_node() {
     fi
 
     echo -e "${GREEN}Cập nhật Node hoàn tất!${NC}"
+    build_and_apply_config
     sleep 2
 }
 
@@ -527,6 +533,7 @@ delete_node() {
         # Xóa luôn trong domain.json nếu tồn tại
         jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$DOMAIN_FILE" > "$DOMAIN_FILE.tmp" && mv "$DOMAIN_FILE.tmp" "$DOMAIN_FILE"
         echo -e "${GREEN}Đã xóa node có tag: $node_tag${NC}"
+        build_and_apply_config
         echo -e "${YELLOW}(Lưu ý: Tường lửa không được đóng tự động để tránh xung đột hệ thống)${NC}"
     else
         echo -e "${RED}Thiếu công cụ jq để xử lý JSON.${NC}"

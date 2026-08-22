@@ -85,6 +85,7 @@ add_user() {
            "secret": $secret
        }]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"; then
         echo -e "${GREEN}Thêm User thành công!${NC}"
+        build_and_apply_config
     else
         echo -e "${RED}Lỗi: Không thể ghi dữ liệu vào tệp users.json!${NC}"
     fi
@@ -100,6 +101,7 @@ delete_user() {
     if command -v jq &> /dev/null; then
         jq --arg username "$username" '[.[] | select(.username != $username)]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
         echo -e "${GREEN}Đã xóa user: $username${NC}"
+        build_and_apply_config
     else
         echo -e "${RED}Thiếu công cụ jq để xử lý JSON.${NC}"
     fi
