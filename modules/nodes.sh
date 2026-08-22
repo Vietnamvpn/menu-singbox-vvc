@@ -463,10 +463,10 @@ handle_node_user_assignment_and_build() {
         done < <(jq -r '.[].username' "$USERS_FILE")
     fi
     echo -e " ${GREEN}0.${NC} Không gán cho user nào"
-    echo -e " ${YELLOW}[Để trống]${NC} Gán vào tất cả user đang có"
     echo -e "${CYAN}================================================================${NC}"
+    echo -e " ${YELLOW}Để trống,${NC} Gán vào tất cả user đang có"
 
-    read -p " Vui lòng chọn số thứ tự user [0-${#user_list[@]} hoặc để trống]: " user_choice
+    read -p " Vui lòng chọn số thứ tự user: " user_choice
 
     if [ -z "$user_choice" ]; then
         echo -e "${GREEN} -> Đã chọn: Gán vào tất cả user đang có.${NC}"
