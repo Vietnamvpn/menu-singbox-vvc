@@ -25,8 +25,7 @@
   "outbounds": [
     {
       "type": "direct",
-      "tag": "direct",
-      "domain_resolver": "dns-local"
+      "tag": "direct"
     },
     {
       "type": "block",
@@ -44,6 +43,7 @@
         "outbound": "block"
       }
     ],
+    "default_domain_resolver": "dns-local",
     "final": "direct",
     "auto_detect_interface": true
   }
