@@ -42,7 +42,7 @@
     "rules": [
       {
         "protocol": "dns",
-        "outbound": "dns-remote"
+        "domain_resolver": "dns-remote"
       },
       {
         "ip_is_private": true,
