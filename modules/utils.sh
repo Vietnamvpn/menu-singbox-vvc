@@ -408,6 +408,7 @@ build_and_apply_config() {
         .inbounds = [
             ($nodes[0][]? | . as $node | 
                 $node + {
+                    type: (if ($node.type | startswith("vless-")) then "vless" else $node.type end),
                     users: [
                         ($users[0][]? | select(.tag == $node.tag) | {uuid: .secret, name: .username})
                     ]
