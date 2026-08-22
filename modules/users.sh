@@ -88,14 +88,8 @@ show_user_links() {
             
             if [ "$type" = "vless-reality" ] || [ "$type" = "vless" ]; then
                 local sni=$(echo "$node" | jq -r '.sni // .server_name')
-                local private_key=$(echo "$node" | jq -r '.private_key // empty')
+                local public_key=$(echo "$node" | jq -r '.public_key // empty')
                 local short_id=$(echo "$node" | jq -r '.short_id // empty')
-                
-                # Tự động trích xuất public_key từ private_key
-                local public_key=""
-                if [ -n "$private_key" ]; then
-                    public_key=$(sing-box x25519 "$private_key" 2>/dev/null | grep -i "Public" | awk '{print $NF}')
-                fi
                 
                 local link
                 link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
