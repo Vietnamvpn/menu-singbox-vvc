@@ -380,11 +380,20 @@ build_and_apply_config() {
     
     local base_config="${INSTALL_DIR}/templates/config.base.json"
     local dest_config="/etc/sing-box/config.json"
-    local users_data="${INSTALL_DIR}/data/users.json"
+    local nodes_file="${INSTALL_DIR}/data/nodes.json"
+    local users_file="${INSTALL_DIR}/data/users.json"
     
-    # 1. Kiểm tra sự tồn tại của file nguồn
+    # 1. Kiểm tra file mẫu và file dữ liệu
     if [ ! -f "$base_config" ]; then
         log_error "File mẫu $base_config không tồn tại!"
+    fi
+
+    if [ ! -f "$nodes_file" ]; then
+        echo "[]" > "$nodes_file"
+    fi
+
+    if [ ! -f "$users_file" ]; then
+        echo "[]" > "$users_file"
     fi
 
     # 2. Kiểm tra thư mục đích
@@ -392,23 +401,31 @@ build_and_apply_config() {
         mkdir -p "/etc/sing-box"
     fi
 
-    # 3. Biên dịch cấu hình
-    # Lưu ý: Lệnh jq dưới đây là ví dụ để "trộn" dữ liệu users vào trường "inbounds" của file config.
-    # Bạn cần tùy chỉnh phần filter trong jq (...) nếu cấu trúc JSON của bạn khác.
-    log_info "Đang trộn dữ liệu người dùng vào cấu hình mẫu..."
+    log_info "Đang tổng hợp nodes và users vào cấu hình..."
     
-    if jq -s '.[0] * {inbounds: .[1]}' "$base_config" <(jq '{inbounds: .}' "$users_data") > "${dest_config}.tmp"; then
-        # Di chuyển file tạm vào vị trí chính thức
+    # 3. Sử dụng jq với --slurpfile để kết hợp base_config, nodes.json và users.json
+    if jq --slurpfile nodes "$nodes_file" --slurpfile users "$users_file" '
+        .inbounds = [
+            ($nodes[0][]? | . as $node | 
+                $node + {
+                    users: [
+                        ($users[0][]? | select(.tag == $node.tag) | {uuid: .secret, name: .username})
+                    ]
+                }
+            )
+        ]
+    ' "$base_config" > "${dest_config}.tmp"; then
+        
         mv "${dest_config}.tmp" "$dest_config"
         log_success "Biên dịch cấu hình thành công tại $dest_config"
         
-        # 4. Kiểm tra cấu hình và Khởi động lại Sing-box
+        # 4. Kiểm tra tính hợp lệ và khởi động lại dịch vụ
         log_info "Đang kiểm tra tính hợp lệ của cấu hình vừa tạo..."
         if sing-box check -c "$dest_config" >/dev/null 2>&1; then
             log_success "Cấu hình hợp lệ!"
             restart_singbox
         else
-            log_error "Cấu hình không hợp lệ! Vui lòng kiểm tra lại dữ liệu JSON."
+            log_error "Cấu hình không hợp lệ! Vui lòng kiểm tra lại cấu trúc node hoặc users."
         fi
     else
         rm -f "${dest_config}.tmp"
