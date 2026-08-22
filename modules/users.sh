@@ -73,8 +73,13 @@ add_user() {
         return
     fi
 
-    local secret=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
-    echo -e "${GREEN} -> Đã tự động tạo secret cho user: $secret${NC}"
+    local secret=""
+    if command -v uuidgen >/dev/null 2>&1; then
+        secret=$(uuidgen)
+    else
+        secret=$(cat /proc/sys/kernel/random/uuid)
+    fi
+    echo -e "${GREEN} -> Đã tự động tạo UUID cho user: $secret${NC}"
 
     if jq --arg username "$username" \
        --arg tag "$target_tag" \
@@ -120,7 +125,12 @@ reset_user_token() {
         return
     fi
 
-    local new_secret=$(tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 16)
+    local new_secret=""
+    if command -v uuidgen >/dev/null 2>&1; then
+        new_secret=$(uuidgen)
+    else
+        new_secret=$(cat /proc/sys/kernel/random/uuid)
+    fi
     
     if jq --arg username "$username" \
        --arg secret "$new_secret" \
