@@ -422,7 +422,6 @@ build_and_apply_config() {
         # 4. Kiểm tra tính hợp lệ và khởi động lại dịch vụ
         log_info "Đang kiểm tra tính hợp lệ của cấu hình vừa tạo..."
         
-        # Lưu lỗi ra biến để đọc
         local check_output
         check_output=$(sing-box check -c "$dest_config" 2>&1)
         
@@ -432,5 +431,8 @@ build_and_apply_config() {
         else
             log_error "Cấu hình không hợp lệ! Chi tiết từ Sing-box:\n$check_output"
         fi
-    }
+    else
+        rm -f "${dest_config}.tmp"
+        log_error "Biên dịch thất bại! Lỗi cú pháp JSON."
+    fi
 }
