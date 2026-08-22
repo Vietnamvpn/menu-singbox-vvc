@@ -375,6 +375,10 @@ extract_json_block() {
 # HÀM BIÊN DỊCH VÀ ÁP DỤNG CẤU HÌNH (BUILD)
 # ==========================================
 
+# ==========================================
+# HÀM BIÊN DỊCH VÀ ÁP DỤNG CẤU HÌNH (BUILD)
+# ==========================================
+
 build_and_apply_config() {
     log_info "Đang tiến hành biên dịch cấu hình Sing-box..."
     
@@ -404,17 +408,18 @@ build_and_apply_config() {
     log_info "Đang tổng hợp nodes và users vào cấu hình..."
     
     # 3. Sử dụng jq với --slurpfile để kết hợp base_config, nodes.json và users.json 
-    # và tái cấu trúc (map) thành định dạng chuẩn Sing-box cho từng giao thức.
+    # và tái cấu trúc khớp hoàn toàn với template vless-reality.json.
     if jq --slurpfile nodes "$nodes_file" --slurpfile users "$users_file" '
         .inbounds = [
             ($nodes[0][]? | . as $n | 
                 ([$users[0][]? | select(.tag == $n.tag)]) as $matched_users |
-                ([$matched_users[] | {uuid: .secret, name: .username}]) as $vless_users |
+                ([$matched_users[] | {uuid: .secret, flow: "xtls-rprx-vision"}]) as $vless_users |
                 
                 if $n.type == "vless-reality" then
                     {
                         type: "vless",
                         tag: $n.tag,
+                        listen: "::",
                         listen_port: $n.port,
                         users: $vless_users,
                         tls: {
@@ -422,7 +427,10 @@ build_and_apply_config() {
                             server_name: $n.sni,
                             reality: {
                                 enabled: true,
-                                handshake: { server: $n.sni },
+                                handshake: {
+                                    server: $n.sni,
+                                    server_port: 443
+                                },
                                 private_key: $n.private_key,
                                 short_id: [$n.short_id]
                             }
@@ -432,8 +440,9 @@ build_and_apply_config() {
                     {
                         type: "vless",
                         tag: $n.tag,
+                        listen: "::",
                         listen_port: $n.port,
-                        users: $vless_users,
+                        users: ([$matched_users[] | {uuid: .secret}]),
                         tls: {
                             enabled: true,
                             server_name: $n.domain,
@@ -449,6 +458,7 @@ build_and_apply_config() {
                     {
                         type: "vless",
                         tag: $n.tag,
+                        listen: "::",
                         listen_port: $n.port,
                         users: $vless_users,
                         tls: {
@@ -456,7 +466,10 @@ build_and_apply_config() {
                             server_name: $n.sni,
                             reality: {
                                 enabled: true,
-                                handshake: { server: $n.sni },
+                                handshake: {
+                                    server: $n.sni,
+                                    server_port: 443
+                                },
                                 private_key: $n.private_key,
                                 short_id: [$n.short_id]
                             }
@@ -470,8 +483,9 @@ build_and_apply_config() {
                     {
                         type: "hysteria2",
                         tag: $n.tag,
+                        listen: "::",
                         listen_port: $n.port,
-                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {password: .secret, name: .username}] else [{password: $n.password}] end),
+                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {password: .secret}] else [{password: $n.password}] end),
                         up_mbps: ($n.up_mbps | tonumber),
                         down_mbps: ($n.down_mbps | tonumber),
                         tls: {
@@ -484,8 +498,9 @@ build_and_apply_config() {
                     {
                         type: "tuic",
                         tag: $n.tag,
+                        listen: "::",
                         listen_port: $n.port,
-                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {uuid: .secret, password: .secret, name: .username}] else [{uuid: $n.uuid, password: $n.password}] end),
+                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {uuid: .secret, password: .secret}] else [{uuid: $n.uuid, password: $n.password}] end),
                         tls: {
                             enabled: true,
                             certificate_path: $n.cert_path,
