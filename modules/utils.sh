@@ -432,4 +432,5 @@ build_and_apply_config() {
         else
             log_error "Cấu hình không hợp lệ! Chi tiết từ Sing-box:\n$check_output"
         fi
+    }
 }
