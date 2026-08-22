@@ -562,3 +562,44 @@ generate_vless_grpc_reality_link() {
     
     echo "$link"
 }
+
+# Ráp link cho VLESS WS TLS
+generate_vless_ws_tls_link() {
+    local tag="$1"
+    local address="$2"
+    local port="$3"
+    local uuid="$4"
+    local domain="$5"
+    local ws_path="$6"
+    
+    local link="vless://${uuid}@${address}:${port}?encryption=none&security=tls&sni=${domain}&type=ws&path=${ws_path}#${tag}"
+    
+    echo "$link"
+}
+
+# Ráp link cho Hysteria2
+generate_hysteria2_link() {
+    local tag="$1"
+    local address="$2"
+    local port="$3"
+    local password="$4"
+    local domain="$5"
+    
+    local link="hysteria2://${password}@${address}:${port}?sni=${domain}#${tag}"
+    
+    echo "$link"
+}
+
+# Ráp link cho TUIC
+generate_tuic_link() {
+    local tag="$1"
+    local address="$2"
+    local port="$3"
+    local uuid="$4"
+    local password="$5"
+    local domain="$6"
+    
+    local link="tuic://${uuid}:${password}@${address}:${port}?congestion_control=bbr&sni=${domain}&alpn=h3#${tag}"
+    
+    echo "$link"
+}
