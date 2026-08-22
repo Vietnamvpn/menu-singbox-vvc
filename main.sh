@@ -29,34 +29,22 @@ show_banner() {
     echo -e "${BLUE}================================================================${NC}"
 }
 
-# Menu con: Quản lý Node (Chỉ hiện khi bấm vào Quản lý Node ở menu chính)
-show_node_menu() {
+# Menu con: Quản lý Routing & Relay (Đã dọn dẹp bỏ các mục node cũ)
+show_routing_menu() {
     while true; do
         clear
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${BLUE}||${NC}                    ${YELLOW}QUẢN LÝ NODE & ROUTING${NC}                  ${BLUE}||${NC}"
+        echo -e "${BLUE}||${NC}                    ${YELLOW}QUẢN LÝ ROUTING & RELAY${NC}                  ${BLUE}||${NC}"
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${GREEN} 1.${NC} Hiển Thị & Quản Lý Node"
-        echo -e "${GREEN} 2.${NC} Thêm Node"
-        echo -e "${GREEN} 3.${NC} Thêm Entry"
-        echo -e "${GREEN} 4.${NC} Thêm Outbound"
-        echo -e "${GREEN} 5.${NC} Thêm Routing"
+        echo -e "${GREEN} 1.${NC} Thêm Entry"
+        echo -e "${GREEN} 2.${NC} Thêm Outbound"
+        echo -e "${GREEN} 3.${NC} Thêm Routing"
         echo -e "${RED} 0.${NC} Quay Lại Menu Chính"
         echo -e "${CYAN}================================================================${NC}"
-        read -p " Vui lòng chọn chức năng [0-5]: " sub_choice
+        read -p " Vui lòng chọn chức năng [0-3]: " sub_choice
 
         case $sub_choice in
-            1|2)
-                clear
-                log_info "Đang mở Quản lý Node..."
-                if [ -f "$INSTALL_DIR/modules/nodes.sh" ]; then
-                    bash "$INSTALL_DIR/modules/nodes.sh"
-                else
-                    log_warn "Chưa có module nodes.sh"
-                    read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
-                fi
-                ;;
-            3)
+            1)
                 clear
                 log_info "Đang mở Quản lý Entry Node..."
                 if [ -f "$INSTALL_DIR/modules/entry-node.sh" ]; then
@@ -66,7 +54,7 @@ show_node_menu() {
                     read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
                 fi
                 ;;
-            4)
+            2)
                 clear
                 log_info "Đang mở Quản lý Node Relay (Outbound)..."
                 if [ -f "$INSTALL_DIR/modules/outbound.sh" ]; then
@@ -76,7 +64,7 @@ show_node_menu() {
                     read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
                 fi
                 ;;
-            5)
+            3)
                 clear
                 log_info "Đang mở Cấu hình Định tuyến (Routing)..."
                 if [ -f "$INSTALL_DIR/modules/routing.sh" ]; then
@@ -103,19 +91,29 @@ show_node_menu() {
 show_menu() {
     clear
     show_banner
-    echo -e " ${GREEN}1.${NC} Quản Lý Node & Routing   ${CYAN}│${NC}  ${GREEN}2.${NC} Quản Lý Người Dùng"
-    echo -e " ${GREEN}3.${NC} Quản Lý Chứng Chỉ SSL    ${CYAN}│${NC}  ${GREEN}4.${NC} Quản Lý Sing Box Core"
-    echo -e " ${GREEN}5.${NC} API Web Trung Tâm        ${CYAN}│${NC}  ${GREEN}6.${NC} Kích Hoạt TCP BBR"
-    echo -e " ${GREEN}7.${NC} Thêm Bộ Nhớ Swap         ${CYAN}│${NC}  ${GREEN}8.${NC} Cập Nhật Hệ Thống"
+    echo -e " ${GREEN}1.${NC} Quản Lý Node             ${CYAN}│${NC}  ${GREEN}2.${NC} Quản Lý Routing & Relay"
+    echo -e " ${GREEN}3.${NC} Quản Lý Người Dùng       ${CYAN}│${NC}  ${GREEN}4.${NC} Quản Lý Chứng Chỉ SSL"
+    echo -e " ${GREEN}5.${NC} Quản Lý Sing Box Core    ${CYAN}│${NC}  ${GREEN}6.${NC} API Web Trung Tâm"
+    echo -e " ${GREEN}7.${NC} Kích Hoạt BBR & Thêm Swap${CYAN}│${NC}  ${GREEN}8.${NC} Cập Nhật Hệ Thống"
     echo -e " ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn          ${CYAN}│${NC}  ${RED}0.${NC} Thoát Khỏi Menu"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn một chức năng [0-9]: " choice
 
     case $choice in
         1)
-            show_node_menu
+            clear
+            log_info "Đang mở Quản lý Node..."
+            if [ -f "$INSTALL_DIR/modules/nodes.sh" ]; then
+                bash "$INSTALL_DIR/modules/nodes.sh"
+            else
+                log_warn "Chưa có module nodes.sh"
+                read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
+            fi
             ;;
         2)
+            show_routing_menu
+            ;;
+        3)
             clear
             log_info "Đang mở Quản lý Người dùng..."
             if [ -f "$INSTALL_DIR/modules/users.sh" ]; then
@@ -125,7 +123,7 @@ show_menu() {
                 read -n 1 -s -r -p "Nhấn phím bất kỳ để quay lại..."
             fi
             ;;
-        3)
+        4)
             clear
             log_info "Đang mở Quản lý SSL..."
             if [ -f "$INSTALL_DIR/modules/ssl.sh" ]; then
@@ -135,7 +133,7 @@ show_menu() {
                 read -n 1 -s -r -p "Nhấn phím bất kỳ để quay lại..."
             fi
             ;;
-        4)
+        5)
             clear
             log_info "Đang mở Quản lý Hệ thống & Service..."
             if [ -f "$INSTALL_DIR/modules/system.sh" ]; then
@@ -145,7 +143,7 @@ show_menu() {
                 read -n 1 -s -r -p "Nhấn phím bất kỳ để quay lại..."
             fi
             ;;
-        5)
+        6)
             clear
             log_info "Đang mở API Web Trung tâm..."
             if [ -f "$INSTALL_DIR/modules/api-web.sh" ]; then
@@ -155,15 +153,15 @@ show_menu() {
                 read -n 1 -s -r -p "Nhấn phím bất kỳ để quay lại..."
             fi
             ;;
-        6)
-            clear
-            enable_bbr
-            read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
-            ;;
         7)
             clear
-            read -p "Nhập dung lượng Swap muốn tạo (Ví dụ: 2G, 1G) [Mặc định 2G]: " swap_input
-            add_swap "${swap_input:-2G}"
+            enable_bbr
+            echo ""
+            read -p "Bạn có muốn thiết lập thêm bộ nhớ Swap không? (y/N): " swap_yn
+            if [[ "$swap_yn" =~ ^[Yy]$ ]]; then
+                read -p "Nhập dung lượng Swap muốn tạo (Ví dụ: 2G, 1G) [Mặc định 2G]: " swap_input
+                add_swap "${swap_input:-2G}"
+            fi
             read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
             ;;
         8)
@@ -191,10 +189,8 @@ show_menu() {
             ;;
     esac
 }
+
 # Vòng lặp chính
-
 while true; do
-
     show_menu
-
-done 
+done
