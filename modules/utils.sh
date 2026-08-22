@@ -409,7 +409,6 @@ build_and_apply_config() {
         .inbounds = [
             ($nodes[0][]? | . as $n | 
                 ([$users[0][]? | select(.tag == $n.tag or .tag == "all")]) as $matched_users |
-                ([$matched_users[] | {uuid: .secret, flow: "xtls-rprx-vision"}]) as $vless_users |
                 
                 if $n.type == "vless-reality" then
                     {
@@ -417,7 +416,7 @@ build_and_apply_config() {
                         tag: $n.tag,
                         listen: "::",
                         listen_port: $n.port,
-                        users: $vless_users,
+                        users: ([$matched_users[] | {uuid: .secret, flow: "xtls-rprx-vision"}]),
                         tls: {
                             enabled: true,
                             server_name: $n.sni,
@@ -456,7 +455,7 @@ build_and_apply_config() {
                         tag: $n.tag,
                         listen: "::",
                         listen_port: $n.port,
-                        users: $vless_users,
+                        users: ([$matched_users[] | {uuid: .secret}]),
                         tls: {
                             enabled: true,
                             server_name: $n.sni,
@@ -545,6 +544,21 @@ generate_vless_reality_link() {
     local short_id="$7"
     
     local link="vless://${uuid}@${address}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni}&fp=chrome&pbk=${public_key}&sid=${short_id}&type=tcp#${tag}"
+    
+    echo "$link"
+}
+
+generate_vless_grpc_reality_link() {
+    local tag="$1"
+    local address="$2"
+    local port="$3"
+    local uuid="$4"
+    local sni="$5"
+    local public_key="$6"
+    local short_id="$7"
+    local service_name="$8"
+    
+    local link="vless://${uuid}@${address}:${port}?encryption=none&security=reality&sni=${sni}&fp=chrome&pbk=${public_key}&sid=${short_id}&type=grpc&serviceName=${service_name}#${tag}"
     
     echo "$link"
 }
