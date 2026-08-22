@@ -133,13 +133,13 @@ ask_domain() {
     fi
 }
 
-# 4. Form nhập Tag
+# 4. Form nhập Tag (Chỉ lấy tiền tố và cổng đang dùng)
 ASKED_TAG=""
 ask_tag() {
     local default_prefix=$1
-    read -p " Nhập Tag cho Node [Để trống = ngẫu nhiên]: " ASKED_TAG
+    read -p " Nhập Tag cho Node [Để trống = tự động theo port]: " ASKED_TAG
     if [ -z "$ASKED_TAG" ]; then
-        ASKED_TAG="${default_prefix}-${ASKED_PORT}-$((RANDOM % 9000 + 1000))"
+        ASKED_TAG="${default_prefix}-${ASKED_PORT}"
         echo -e "${GREEN} -> Đã tạo Tag tự động: $ASKED_TAG${NC}"
     fi
 }
@@ -172,16 +172,13 @@ check_tag_exists() {
 # CÁC HÀM AUTO-GENERATE (KHÔNG CẦN FORM NHẬP)
 # ====================================================================
 
-# Sửa hàm sinh Key: Bắt mọi định dạng chữ và chuẩn hóa fallback x25519
 AUTO_PK=""
 generate_private_key() {
     if command -v sing-box &> /dev/null; then
         local kp=$(sing-box generate reality-keypair)
-        # Sử dụng grep -iE và awk để xử lý linh hoạt khoảng trắng
         AUTO_PK=$(echo "$kp" | grep -iE "private" | awk -F':' '{print $2}' | tr -d ' \r\n')
     fi
     
-    # Nếu biến trống do lỗi hệ thống -> Tạo base64url đúng chuẩn 43 ký tự
     if [ -z "$AUTO_PK" ]; then
         AUTO_PK=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | head -c 43)
     fi
@@ -243,7 +240,6 @@ form_vless_reality() {
     echo -e "${BLUE}             THÊM NODE: VLESS REALITY (TCP)                    ${NC}"
     echo -e "${CYAN}================================================================${NC}"
     
-    # Chốt chặn an toàn định dạng JSON
     if [ ! -s "$NODES_FILE" ] || ! jq -e . "$NODES_FILE" >/dev/null 2>&1; then
         echo "[]" > "$NODES_FILE"
     fi
@@ -275,7 +271,6 @@ form_vless_reality() {
            "short_id": $short_id
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    # Lưu riêng domain vào domain.json
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node VLESS REALITY thành công! Tag: $ASKED_TAG${NC}"
@@ -316,7 +311,6 @@ form_vless_ws_tls() {
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    # Lưu riêng domain vào domain.json
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node VLESS WS TLS thành công! Tag: $ASKED_TAG${NC}"
@@ -403,7 +397,6 @@ form_hy2() {
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    # Lưu riêng domain vào domain.json
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node Hysteria 2 thành công! Tag: $ASKED_TAG${NC}"
@@ -446,7 +439,6 @@ form_tuic() {
            "key_path": $key_path
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
-    # Lưu riêng domain vào domain.json
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
 
     echo -e "${GREEN}Thêm Node TUIC thành công! Tag: $ASKED_TAG${NC}"
@@ -481,6 +473,48 @@ add_node_menu() {
     done
 }
 
+# Cập nhật Node
+update_node() {
+    clear
+    list_nodes
+    read -p " Nhập Tag của node cần cập nhật: " node_tag
+    if [ -z "$node_tag" ]; then return; fi
+
+    if ! grep -q "\"tag\": \"$node_tag\"" "$NODES_FILE" 2>/dev/null; then
+        echo -e "${RED}Lỗi: Không tìm thấy node với tag '$node_tag'!${NC}"
+        sleep 2
+        return
+    fi
+
+    echo -e "${GREEN} -> Đang tiến hành cập nhật cho node: $node_tag${NC}"
+    
+    read -p " Nhập Tên miền (Domain) mới [Để trống để giữ nguyên]: " new_domain
+    read -p " Nhập Port mới [Để trống để giữ nguyên]: " new_port
+
+    if [ -n "$new_domain" ]; then
+        jq --arg tag "$node_tag" --arg domain "$new_domain" \
+           '(.[] | select(.tag == $tag).domain) = $domain' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
+        save_domain_mapping "$node_tag" "$new_domain"
+        echo -e "${GREEN} -> Cập nhật Domain thành công.${NC}"
+    fi
+
+    if [ -n "$new_port" ]; then
+        if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+            echo -e "${RED}Lỗi: Port không hợp lệ! Bỏ qua cập nhật port.${NC}"
+        elif ! check_port_usage "$new_port"; then
+            echo -e "${RED}Lỗi: Port $new_port đã có người dùng! Bỏ qua cập nhật port.${NC}"
+        else
+            open_firewall_port "$new_port"
+            jq --arg tag "$node_tag" --argjson port "$new_port" \
+               '(.[] | select(.tag == $tag).port) = $port' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
+            echo -e "${GREEN} -> Cập nhật Port thành công.${NC}"
+        fi
+    fi
+
+    echo -e "${GREEN}Cập nhật Node hoàn tất!${NC}"
+    sleep 2
+}
+
 # Xóa Node
 delete_node() {
     clear
@@ -490,6 +524,8 @@ delete_node() {
 
     if command -v jq &> /dev/null; then
         jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
+        # Xóa luôn trong domain.json nếu tồn tại
+        jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$DOMAIN_FILE" > "$DOMAIN_FILE.tmp" && mv "$DOMAIN_FILE.tmp" "$DOMAIN_FILE"
         echo -e "${GREEN}Đã xóa node có tag: $node_tag${NC}"
         echo -e "${YELLOW}(Lưu ý: Tường lửa không được đóng tự động để tránh xung đột hệ thống)${NC}"
     else
@@ -506,10 +542,11 @@ while true; do
     echo -e "${CYAN}================================================================${NC}"
     echo -e " ${GREEN}1.${NC} Hiển thị danh sách Node"
     echo -e " ${GREEN}2.${NC} Thêm Node mới"
-    echo -e " ${GREEN}3.${NC} Xóa Node"
+    echo -e " ${GREEN}3.${NC} Cập nhật Node"
+    echo -e " ${GREEN}4.${NC} Xóa Node"
     echo -e " ${RED}0.${NC} Quay lại Menu chính"
     echo -e "${CYAN}================================================================${NC}"
-    read -p " Vui lòng chọn chức năng [0-3]: " choice
+    read -p " Vui lòng chọn chức năng [0-4]: " choice
 
     case $choice in
         1)
@@ -520,6 +557,9 @@ while true; do
             add_node_menu
             ;;
         3)
+            update_node
+            ;;
+        4)
             delete_node
             ;;
         0)
