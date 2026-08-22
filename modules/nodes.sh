@@ -3,6 +3,7 @@
 INSTALL_DIR="/opt/menu-singbox-vvc"
 NODES_FILE="$INSTALL_DIR/data/nodes.json"
 DOMAIN_FILE="$INSTALL_DIR/data/domain.json"
+USERS_FILE="$INSTALL_DIR/data/users.json"
 mkdir -p "$INSTALL_DIR/data"
 
 if [ ! -f "$NODES_FILE" ]; then
@@ -11,6 +12,10 @@ fi
 
 if [ ! -f "$DOMAIN_FILE" ]; then
     echo "[]" > "$DOMAIN_FILE"
+fi
+
+if [ ! -f "$USERS_FILE" ]; then
+    echo "[]" > "$USERS_FILE"
 fi
 
 # Nhúng màu sắc và các hàm tiện ích dùng chung từ utils.sh
@@ -25,7 +30,6 @@ fi
 # CÁC HÀM PHỤ TRỢ (HELPER) KIỂM TRA VÀ TỰ ĐỘNG TẠO DỮ LIỆU
 # ====================================================================
 
-# Kiểm tra port đã sử dụng trong config hoặc đang mở trên hệ thống chưa
 check_port_usage() {
     local check_port=$1
     if grep -q "\"port\": *$check_port\b" "$NODES_FILE" 2>/dev/null; then
@@ -43,7 +47,6 @@ check_port_usage() {
     return 0
 }
 
-# Lấy một port ngẫu nhiên chưa ai dùng
 get_random_port() {
     while true; do
         local rand_port=$((RANDOM % 4001 + 2000))
@@ -54,7 +57,6 @@ get_random_port() {
     done
 }
 
-# Tự động mở port trên các loại tường lửa
 open_firewall_port() {
     local port=$1
     echo -e "${YELLOW} Đang kiểm tra và mở port $port trên tường lửa...${NC}"
@@ -90,7 +92,6 @@ save_domain_mapping() {
     fi
 }
 
-# 1. Form nhập Port
 ASKED_PORT=""
 ask_port() {
     while true; do
@@ -110,7 +111,6 @@ ask_port() {
     open_firewall_port "$ASKED_PORT"
 }
 
-# 2. Form nhập SNI
 ASKED_SNI=""
 ask_sni() {
     read -p " Nhập SNI (Server Name) [Để trống = tự tạo ngẫu nhiên]: " ASKED_SNI
@@ -122,7 +122,6 @@ ask_sni() {
     fi
 }
 
-# 3. Form nhập Domain (Lấy IP VPS nếu để trống)
 ASKED_DOMAIN=""
 ask_domain() {
     read -p " Nhập Tên miền (Domain) [Để trống = lấy IP VPS]: " ASKED_DOMAIN
@@ -133,7 +132,6 @@ ask_domain() {
     fi
 }
 
-# 4. Form nhập Tag (Chỉ lấy tiền tố và cổng đang dùng)
 ASKED_TAG=""
 ask_tag() {
     local default_prefix=$1
@@ -144,7 +142,6 @@ ask_tag() {
     fi
 }
 
-# 5. Form nhập Chứng chỉ
 ASKED_CERT=""
 ASKED_KEY=""
 ask_cert() {
@@ -158,7 +155,6 @@ ask_cert() {
     echo -e "${GREEN} -> Key: $ASKED_KEY${NC}"
 }
 
-# Hàm kiểm tra trùng lặp Tag
 check_tag_exists() {
     if grep -q "\"tag\": \"$ASKED_TAG\"" "$NODES_FILE" 2>/dev/null; then
         echo -e "${RED}Lỗi: Node với tag '$ASKED_TAG' đã tồn tại! Hủy bỏ thao tác.${NC}"
@@ -169,7 +165,7 @@ check_tag_exists() {
 }
 
 # ====================================================================
-# CÁC HÀM AUTO-GENERATE (KHÔNG CẦN FORM NHẬP)
+# CÁC HÀM AUTO-GENERATE
 # ====================================================================
 
 AUTO_PK=""
@@ -219,28 +215,9 @@ generate_password() {
 }
 
 # ====================================================================
-# MENU VÀ GIAO DIỆN QUẢN LÝ
+# CÁC FORM TẠO NODE (KHÔNG GỌI BUILD TRỰC TIẾP NỮA)
 # ====================================================================
 
-list_nodes() {
-    clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                    DANH SÁCH NODE HIỆN TẠI                   ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
-    
-    if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
-        echo -e "${YELLOW}Chưa có node nào được tạo.${NC}"
-    else
-        if command -v jq &> /dev/null; then
-            jq -r '.[] | "Tag: \(.tag) │ Type: \(.type) │ Port: \(.port) │ Domain/SNI: \(.sni // .domain // "N/A")"' "$NODES_FILE"
-        else
-            cat "$NODES_FILE"
-        fi
-    fi
-    echo -e "${CYAN}================================================================${NC}"
-}
-
-# Form 1: VLESS REALITY (TCP)
 form_vless_reality() {
     clear
     echo -e "${CYAN}================================================================${NC}"
@@ -256,7 +233,7 @@ form_vless_reality() {
     ask_domain
     ask_tag "vless-reality"
     
-    check_tag_exists || return
+    check_tag_exists || { ASKED_TAG=""; return; }
 
     generate_private_key
     generate_short_id
@@ -281,13 +258,10 @@ form_vless_reality() {
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
-
     echo -e "${GREEN}Thêm Node VLESS REALITY thành công! Tag: $ASKED_TAG${NC}"
-    build_and_apply_config
-    sleep 2
+    sleep 1
 }
 
-# Form 2: VLESS WebSocket TLS
 form_vless_ws_tls() {
     clear
     echo -e "${CYAN}================================================================${NC}"
@@ -299,7 +273,7 @@ form_vless_ws_tls() {
     ask_cert
     ask_tag "vless-ws-tls"
     
-    check_tag_exists || return
+    check_tag_exists || { ASKED_TAG=""; return; }
 
     local auto_ws_path="/ws-$(tr -dc 'a-z0-9' </dev/urandom | head -c 6)"
     echo -e "${GREEN} -> Đã tự động tạo WS Path: $auto_ws_path${NC}"
@@ -322,13 +296,10 @@ form_vless_ws_tls() {
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
-
     echo -e "${GREEN}Thêm Node VLESS WS TLS thành công! Tag: $ASKED_TAG${NC}"
-    build_and_apply_config
-    sleep 2
+    sleep 1
 }
 
-# Form 3: VLESS gRPC REALITY
 form_vless_grpc_reality() {
     clear
     echo -e "${CYAN}================================================================${NC}"
@@ -339,7 +310,7 @@ form_vless_grpc_reality() {
     ask_sni
     ask_tag "vless-grpc-reality"
     
-    check_tag_exists || return
+    check_tag_exists || { ASKED_TAG=""; return; }
 
     local auto_grpc="grpc-$(tr -dc 'a-z0-9' </dev/urandom | head -c 6)"
     echo -e "${GREEN} -> Đã tự động tạo gRPC Service: $auto_grpc${NC}"
@@ -367,11 +338,9 @@ form_vless_grpc_reality() {
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
     echo -e "${GREEN}Thêm Node VLESS gRPC REALITY thành công! Tag: $ASKED_TAG${NC}"
-    build_and_apply_config
-    sleep 2
+    sleep 1
 }
 
-# Form 4: Hysteria 2
 form_hy2() {
     clear
     echo -e "${CYAN}================================================================${NC}"
@@ -383,7 +352,7 @@ form_hy2() {
     ask_cert
     ask_tag "hy2"
     
-    check_tag_exists || return
+    check_tag_exists || { ASKED_TAG=""; return; }
 
     generate_password
     local auto_up_mbps="100"
@@ -412,13 +381,10 @@ form_hy2() {
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
-
     echo -e "${GREEN}Thêm Node Hysteria 2 thành công! Tag: $ASKED_TAG${NC}"
-    build_and_apply_config
-    sleep 2
+    sleep 1
 }
 
-# Form 5: TUIC
 form_tuic() {
     clear
     echo -e "${CYAN}================================================================${NC}"
@@ -430,7 +396,7 @@ form_tuic() {
     ask_cert
     ask_tag "tuic"
     
-    check_tag_exists || return
+    check_tag_exists || { ASKED_TAG=""; return; }
 
     generate_uuid
     generate_password
@@ -455,14 +421,86 @@ form_tuic() {
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
     save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
-
     echo -e "${GREEN}Thêm Node TUIC thành công! Tag: $ASKED_TAG${NC}"
+    sleep 1
+}
+
+# ====================================================================
+# QUẢN LÝ GÁN USER VÀ XỬ LÝ LẶP THÊM NODE
+# ====================================================================
+
+ADDED_NODE_TAGS=()
+
+handle_node_user_assignment_and_build() {
+    # 1. Kiểm tra nếu chưa có user nào thì tự động tạo mặc định admin
+    if [ ! -s "$USERS_FILE" ] || [ "$(cat "$USERS_FILE")" = "[]" ]; then
+        echo -e "${YELLOW}Hệ thống chưa có user nào. Đang tự động tạo user mặc định 'admin'...${NC}"
+        local admin_secret=""
+        if command -v uuidgen >/dev/null 2>&1; then
+            admin_secret=$(uuidgen)
+        else
+            admin_secret=$(cat /proc/sys/kernel/random/uuid)
+        fi
+        jq --arg username "admin" \
+           --arg tag "all" \
+           --arg secret "$admin_secret" \
+           '[{"username": $username, "tag": $tag, "secret": $secret}]' \
+           "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+        echo -e "${GREEN} -> Đã tạo user 'admin' thành công (UUID: $admin_secret).${NC}"
+    fi
+
+    # 2. Hiển thị danh sách user đang có để chọn
+    clear
+    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}                    CHỌN USER ĐỂ GÁN NODE                      ${NC}"
+    echo -e "${CYAN}================================================================${NC}"
+    
+    local user_list=()
+    if command -v jq &> /dev/null; then
+        local i=1
+        while read -r uname; do
+            echo -e " ${GREEN}$i.${NC} User: $uname"
+            user_list+=("$uname")
+            i=$((i + 1))
+        done < <(jq -r '.[].username' "$USERS_FILE")
+    fi
+    echo -e " ${GREEN}0.${NC} Không gán cho user nào"
+    echo -e " ${YELLOW}[Để trống]${NC} Gán vào tất cả user đang có"
+    echo -e "${CYAN}================================================================${NC}"
+
+    read -p " Vui lòng chọn số thứ tự user [0-${#user_list[@]} hoặc để trống]: " user_choice
+
+    if [ -z "$user_choice" ]; then
+        echo -e "${GREEN} -> Đã chọn: Gán vào tất cả user đang có.${NC}"
+        jq 'map(.tag = "all")' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+    elif [ "$user_choice" -eq 0 ]; then
+        echo -e "${YELLOW} -> Đã chọn: Không gán node cho user nào.${NC}"
+    else
+        local idx=$((user_choice - 1))
+        if [ $idx -ge 0 ] && [ $idx -lt ${#user_list[@]} ]; then
+            local selected_user="${user_list[$idx]}"
+            echo -e "${GREEN} -> Đã chọn gán cho user: $selected_user${NC}"
+            local target_tag="all"
+            if [ ${#ADDED_NODE_TAGS[@]} -eq 1 ]; then
+                target_tag="${ADDED_NODE_TAGS[0]}"
+            fi
+            jq --arg uname "$selected_user" --arg tag "$target_tag" \
+               '(.[] | select(.username == $uname).tag) = $tag' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+        else
+            echo -e "${RED}Lựa chọn không hợp lệ, mặc định gán vào tất cả user đang có!${NC}"
+            jq 'map(.tag = "all")' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+        fi
+    fi
+
+    ADDED_NODE_TAGS=()
+
+    # 3. Gọi hàm biên dịch và áp dụng cấu hình cuối cùng
     build_and_apply_config
     sleep 2
 }
 
-# Sub-Menu Thêm Node
 add_node_menu() {
+    ADDED_NODE_TAGS=()
     while true; do
         clear
         echo -e "${CYAN}================================================================${NC}"
@@ -478,18 +516,71 @@ add_node_menu() {
         read -p " Vui lòng chọn giao thức [0-5]: " proto_choice
 
         case $proto_choice in
-            1) form_vless_reality ;;
-            2) form_vless_ws_tls ;;
-            3) form_vless_grpc_reality ;;
-            4) form_hy2 ;;
-            5) form_tuic ;;
-            0) break ;;
-            *) echo -e "${RED}Lựa chọn không hợp lệ!${NC}"; sleep 1 ;;
+            1) 
+                form_vless_reality 
+                [ -n "$ASKED_TAG" ] && ADDED_NODE_TAGS+=("$ASKED_TAG")
+                ;;
+            2) 
+                form_vless_ws_tls 
+                [ -n "$ASKED_TAG" ] && ADDED_NODE_TAGS+=("$ASKED_TAG")
+                ;;
+            3) 
+                form_vless_grpc_reality 
+                [ -n "$ASKED_TAG" ] && ADDED_NODE_TAGS+=("$ASKED_TAG")
+                ;;
+            4) 
+                form_hy2 
+                [ -n "$ASKED_TAG" ] && ADDED_NODE_TAGS+=("$ASKED_TAG")
+                ;;
+            5) 
+                form_tuic 
+                [ -n "$ASKED_TAG" ] && ADDED_NODE_TAGS+=("$ASKED_TAG")
+                ;;
+            0) 
+                if [ ${#ADDED_NODE_TAGS[@]} -gt 0 ]; then
+                    read -p " Bạn có muốn hoàn tất và gán user cho các node đã tạo không? (y/n): " finish_add
+                    if [[ "$finish_add" =~ ^[Yy]$ ]]; then
+                        handle_node_user_assignment_and_build
+                    else
+                        ADDED_NODE_TAGS=()
+                    fi
+                fi
+                break 
+                ;;
+            *) 
+                echo -e "${RED}Lựa chọn không hợp lệ!${NC}"
+                sleep 1 
+                continue
+                ;;
         esac
+
+        # Hỏi có muốn tiếp tục thêm giao thức nữa không
+        read -p " Bạn có muốn thêm giao thức nữa không? (y/n): " add_more
+        if [[ "$add_more" =~ ^[Nn]$ ]]; then
+            handle_node_user_assignment_and_build
+            break
+        fi
     done
 }
 
-# Cập nhật Node
+list_nodes() {
+    clear
+    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}                    DANH SÁCH NODE HIỆN TẠI                   ${NC}"
+    echo -e "${CYAN}================================================================${NC}"
+    
+    if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
+        echo -e "${YELLOW}Chưa có node nào được tạo.${NC}"
+    else
+        if command -v jq &> /dev/null; then
+            jq -r '.[] | "Tag: \(.tag) │ Type: \(.type) │ Port: \(.port) │ Domain/SNI: \(.sni // .domain // "N/A")"' "$NODES_FILE"
+        else
+            cat "$NODES_FILE"
+        fi
+    fi
+    echo -e "${CYAN}================================================================${NC}"
+}
+
 update_node() {
     clear
     list_nodes
@@ -532,7 +623,6 @@ update_node() {
     sleep 2
 }
 
-# Xóa Node
 delete_node() {
     clear
     list_nodes
@@ -541,7 +631,6 @@ delete_node() {
 
     if command -v jq &> /dev/null; then
         jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
-        # Xóa luôn trong domain.json nếu tồn tại
         jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$DOMAIN_FILE" > "$DOMAIN_FILE.tmp" && mv "$DOMAIN_FILE.tmp" "$DOMAIN_FILE"
         echo -e "${GREEN}Đã xóa node có tag: $node_tag${NC}"
         build_and_apply_config
