@@ -308,6 +308,7 @@ form_vless_grpc_reality() {
 
     ask_port
     ask_sni
+    ask_domain
     ask_tag "vless-grpc-reality"
     
     check_tag_exists || { ASKED_TAG=""; return; }
@@ -321,6 +322,7 @@ form_vless_grpc_reality() {
     jq --arg tag "$ASKED_TAG" \
        --arg type "vless-grpc-reality" \
        --argjson port "$ASKED_PORT" \
+       --arg domain "$ASKED_DOMAIN" \
        --arg grpc_service "$auto_grpc" \
        --arg sni "$ASKED_SNI" \
        --arg private_key "$AUTO_PK" \
@@ -330,6 +332,7 @@ form_vless_grpc_reality() {
            "tag": $tag,
            "type": $type,
            "port": $port,
+           "domain": $domain,
            "grpc_service": $grpc_service,
            "sni": $sni,
            "private_key": $private_key,
@@ -337,6 +340,7 @@ form_vless_grpc_reality() {
            "short_id": $short_id
        }]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
 
+    save_domain_mapping "$ASKED_TAG" "$ASKED_DOMAIN"
     echo -e "${GREEN}Thêm Node VLESS gRPC REALITY thành công! Tag: $ASKED_TAG${NC}"
     sleep 1
 }
