@@ -1,6 +1,11 @@
 #!/bin/bash
 
-OUTBOUND_FILE="/opt/menu-singbox-vvc/data/outbound.json"
+INSTALL_DIR="/opt/menu-singbox-vvc"
+if [ -f "$INSTALL_DIR/modules/utils.sh" ]; then
+    source "$INSTALL_DIR/modules/utils.sh"
+fi
+
+OUTBOUND_FILE="${INSTALL_DIR}/data/outbound.json"
 
 mkdir -p "$(dirname "$OUTBOUND_FILE")"
 [ ! -f "$OUTBOUND_FILE" ] && echo "[]" > "$OUTBOUND_FILE"
@@ -9,17 +14,17 @@ mkdir -p "$(dirname "$OUTBOUND_FILE")"
 render_outbound_menu() {
     while true; do
         clear
-        echo "================================================================"
-        echo "||                  QUẢN LÝ OUTBOUND & RELAY                  ||"
-        echo "================================================================"
+        echo -e "${BLUE}================================================================${NC}"
+        echo -e "${BLUE}||${NC}                  ${YELLOW}QUẢN LÝ OUTBOUND & RELAY                  ${BLUE}||${NC}"
+        echo -e "${BLUE}================================================================${NC}"
         list_outbounds_table
-        echo "================================================================"
-        echo " 1. Thêm Outbound Thủ Công"
-        echo " 2. Thêm Outbound từ Link Chia Sẻ (Share Link)"
-        echo " 3. Sửa Outbound"
-        echo " 4. Xóa Outbound"
-        echo " 0. Quay lại Menu Chính"
-        echo "================================================================"
+        echo -e "${BLUE}================================================================${NC}"
+        echo -e " ${GREEN}1.${NC} Thêm Outbound Thủ Công"
+        echo -e " ${GREEN}2.${NC} Thêm Outbound từ Link Chia Sẻ (Share Link)"
+        echo -e " ${GREEN}3.${NC} Sửa Outbound"
+        echo -e " ${GREEN}4.${NC} Xóa Outbound"
+        echo -e " ${RED}0.${NC} Quay lại Menu Chính"
+        echo -e "${BLUE}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-4]: " choice
 
         case "$choice" in
@@ -39,7 +44,7 @@ render_outbound_menu() {
                 break
                 ;;
             *)
-                echo -e "\033[31m[LỖI] Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 4.\033[0m"
+                echo -e "${RED}[LỖI] Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 4.${NC}"
                 sleep 1
                 ;;
         esac
@@ -48,15 +53,15 @@ render_outbound_menu() {
 
 # Hiển thị bảng danh sách outbound
 list_outbounds_table() {
-    echo " Danh sách Outbound hiện tại:"
+    echo -e " ${CYAN}Danh sách Outbound hiện tại:${NC}"
     if [ ! -s "$OUTBOUND_FILE" ] || [ "$(jq length "$OUTBOUND_FILE" 2>/dev/null)" -eq 0 ]; then
-        echo " (Chưa có outbound nào được cấu hình)"
+        echo -e " ${YELLOW}(Chưa có outbound nào được cấu hình)${NC}"
         return
     fi
     
-    echo "----------------------------------------------------------------"
-    printf "%-4s | %-20s | %-12s | %-20s\n" "STT" "Tag" "Loại (Type)" "Địa chỉ:Cổng"
-    echo "----------------------------------------------------------------"
+    echo -e "${CYAN}----------------------------------------------------------------${NC}"
+    printf "${CYAN}%-4s${NC} | ${GREEN}%-20s${NC} | ${YELLOW}%-12s${NC} | ${BLUE}%-20s${NC}\n" "STT" "Tag" "Loại (Type)" "Địa chỉ:Cổng"
+    echo -e "${CYAN}----------------------------------------------------------------${NC}"
     
     local count
     count=$(jq length "$OUTBOUND_FILE")
@@ -68,18 +73,18 @@ list_outbounds_table() {
         port=$(jq -r --argjson idx "$i" '.[$idx].server_port // .[$idx].port // "N/A"' "$OUTBOUND_FILE")
         printf "%-4d | %-20s | %-12s | %-20s\n" "$((i+1))" "$tag" "$type" "$server:$port"
     done
-    echo "----------------------------------------------------------------"
+    echo -e "${CYAN}----------------------------------------------------------------${NC}"
 }
 
 # Thêm outbound thủ công
 add_outbound_manual() {
-    echo "--------------------------------------------------"
-    echo " THÊM OUTBOUND THỦ CÔNG"
-    echo "--------------------------------------------------"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${YELLOW} THÊM OUTBOUND THỦ CÔNG${NC}"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
     
     read -p "Nhập Tag (Tên định danh duy nhất): " tag
     if [ -z "$tag" ]; then
-        echo -e "\033[31m[LỖI] Tag không được để trống!\033[0m"
+        echo -e "${RED}[LỖI] Tag không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -87,39 +92,37 @@ add_outbound_manual() {
     local exists
     exists=$(jq --arg t "$tag" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
     if [ "$exists" -gt 0 ]; then
-        echo -e "\033[31m[LỖI] Tag '$tag' đã tồn tại! Vui lòng chọn tên khác.\033[0m"
+        echo -e "${RED}[LỖI] Tag '$tag' đã tồn tại! Vui lòng chọn tên khác.${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
     read -p "Nhập Loại Outbound (vd: vless, vmess, trojan, hysteria2, tuic, socks, shadowsocks): " type
     if [ -z "$type" ]; then
-        echo -e "\033[31m[LỖI] Loại outbound không được để trống!\033[0m"
+        echo -e "${RED}[LỖI] Loại outbound không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
     read -p "Nhập Địa chỉ Server: " server
     if [ -z "$server" ]; then
-        echo -e "\033[31m[LỖI] Địa chỉ Server không được để trống!\033[0m"
+        echo -e "${RED}[LỖI] Địa chỉ Server không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
     read -p "Nhập Cổng (Port): " port
     if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-        echo -e "\033[31m[LỖI] Cổng (Port) phải là một số nguyên hợp lệ!\033[0m"
+        echo -e "${RED}[LỖI] Cổng (Port) phải là một số nguyên hợp lệ!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
-    # Lưu theo đúng chuẩn sing-box (server_port)
     jq --arg t "$tag" --arg tp "$type" --arg s "$server" --argjson p "$port" \
        '. += [{"type": $tp, "tag": $t, "server": $s, "server_port": $p}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
 
-    echo -e "\033[32m[THÀNH CÔNG] Đã thêm outbound '$tag' thành công!\033[0m"
+    log_success "Đã thêm outbound '$tag' thành công!"
     
-    # Gọi hàm build cấu hình hệ thống
     if declare -f build_and_apply_config > /dev/null; then
         build_and_apply_config
     fi
@@ -129,12 +132,12 @@ add_outbound_manual() {
 
 # Thêm outbound từ link chia sẻ
 add_outbound_from_link() {
-    echo "--------------------------------------------------"
-    echo " THÊM OUTBOUND TỪ LINK CHIA SẺ"
-    echo "--------------------------------------------------"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${YELLOW} THÊM OUTBOUND TỪ LINK CHIA SẺ${NC}"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
     read -p "Dán link chia sẻ (vless://, vmess://, trojan://, hy2://, tuic://, socks://, ss://...): " link
     if [ -z "$link" ]; then
-        echo -e "\033[31m[LỖI] Link không được để trống!\033[0m"
+        echo -e "${RED}[LỖI] Link không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -190,7 +193,7 @@ add_outbound_from_link() {
     fi
 
     if [ -z "$server" ]; then
-        echo -e "\033[31m[LỖI] Không thể phân tích được địa chỉ Server từ link này.\033[0m"
+        echo -e "${RED}[LỖI] Không thể phân tích được địa chỉ Server từ link này.${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -198,7 +201,7 @@ add_outbound_from_link() {
     jq --arg t "$tag" --arg tp "$type" --arg s "$server" --argjson p "$port" --arg l "$link" \
        '. += [{"type": $tp, "tag": $t, "server": $s, "server_port": $p, "raw_link": $l}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
 
-    echo -e "\033[32m[THÀNH CÔNG] Đã thêm outbound '$tag' (Loại: $type, Server: $server:$port) thành công!\033[0m"
+    log_success "Đã thêm outbound '$tag' (Loại: $type, Server: $server:$port) thành công!"
     
     if declare -f build_and_apply_config > /dev/null; then
         build_and_apply_config
@@ -209,12 +212,12 @@ add_outbound_from_link() {
 
 # Sửa outbound hiện có
 edit_outbound() {
-    echo "--------------------------------------------------"
-    echo " SỬA OUTBOUND"
-    echo "--------------------------------------------------"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${YELLOW} SỬA OUTBOUND${NC}"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
     
     if [ ! -s "$OUTBOUND_FILE" ] || [ "$(jq length "$OUTBOUND_FILE" 2>/dev/null)" -eq 0 ]; then
-        echo -e "\033[33m[CẢNH BÁO] Không có outbound nào trong hệ thống để sửa.\033[0m"
+        echo -e "${YELLOW}[CẢNH BÁO] Không có outbound nào trong hệ thống để sửa.${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -223,7 +226,7 @@ edit_outbound() {
     read -p "Nhập số thứ tự (STT) của outbound cần sửa: " index_input
 
     if ! [[ "$index_input" =~ ^[0-9]+$ ]]; then
-        echo -e "\033[31m[LỖI] STT phải là một số nguyên hợp lệ!\033[0m"
+        echo -e "${RED}[LỖI] STT phải là một số nguyên hợp lệ!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -233,7 +236,7 @@ edit_outbound() {
     count=$(jq length "$OUTBOUND_FILE")
 
     if [ "$idx" -lt 0 ] || [ "$idx" -ge "$count" ]; then
-        echo -e "\033[31m[LỖI] Số thứ tự ($index_input) vượt quá giới hạn danh sách!\033[0m"
+        echo -e "${RED}[LỖI] Số thứ tự ($index_input) vượt quá giới hạn danh sách!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -244,7 +247,7 @@ edit_outbound() {
     old_server=$(jq -r --argjson i "$idx" '.[$i].server // ""' "$OUTBOUND_FILE")
     old_port=$(jq -r --argjson i "$idx" '.[$i].server_port // .[$i].port // 0' "$OUTBOUND_FILE")
 
-    echo "Đang sửa Outbound: $old_tag"
+    echo -e "Đang sửa Outbound: ${CYAN}$old_tag${NC}"
     read -p "Nhập Tag mới [Mặc định: $old_tag]: " new_tag
     new_tag="${new_tag:-$old_tag}"
 
@@ -252,7 +255,7 @@ edit_outbound() {
         local exists
         exists=$(jq --arg t "$new_tag" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
         if [ "$exists" -gt 0 ]; then
-            echo -e "\033[31m[LỖI] Tag '$new_tag' đã bị trùng với outbound khác!\033[0m"
+            echo -e "${RED}[LỖI] Tag '$new_tag' đã bị trùng với outbound khác!${NC}"
             read -p "Nhấn Enter để tiếp tục..."
             return
         fi
@@ -268,7 +271,7 @@ edit_outbound() {
     new_port="${new_port:-$old_port}"
 
     if ! [[ "$new_port" =~ ^[0-9]+$ ]]; then
-        echo -e "\033[31m[LỖI] Cổng (Port) phải là một số nguyên hợp lệ!\033[0m"
+        echo -e "${RED}[LỖI] Cổng (Port) phải là một số nguyên hợp lệ!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -276,7 +279,7 @@ edit_outbound() {
     jq --argjson i "$idx" --arg t "$new_tag" --arg tp "$new_type" --arg s "$new_server" --argjson p "$new_port" \
        '.[$i] = {"type": $tp, "tag": $t, "server": $s, "server_port": $p}' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
 
-    echo -e "\033[32m[THÀNH CÔNG] Đã cập nhật outbound thành công!\033[0m"
+    log_success "Đã cập nhật outbound thành công!"
     
     if declare -f build_and_apply_config > /dev/null; then
         build_and_apply_config
@@ -287,12 +290,12 @@ edit_outbound() {
 
 # Xóa outbound
 delete_outbound() {
-    echo "--------------------------------------------------"
-    echo " XÓA OUTBOUND"
-    echo "--------------------------------------------------"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${RED} XÓA OUTBOUND${NC}"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
     
     if [ ! -s "$OUTBOUND_FILE" ] || [ "$(jq length "$OUTBOUND_FILE" 2>/dev/null)" -eq 0 ]; then
-        echo -e "\033[33m[CẢNH BÁO] Không có outbound nào để xóa.\033[0m"
+        echo -e "${YELLOW}[CẢNH BÁO] Không có outbound nào để xóa.${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -301,7 +304,7 @@ delete_outbound() {
     read -p "Nhập số thứ tự (STT) của outbound cần xóa: " index_input
 
     if ! [[ "$index_input" =~ ^[0-9]+$ ]]; then
-        echo -e "\033[31m[LỖI] STT phải là một số nguyên hợp lệ!\033[0m"
+        echo -e "${RED}[LỖI] STT phải là một số nguyên hợp lệ!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -311,7 +314,7 @@ delete_outbound() {
     count=$(jq length "$OUTBOUND_FILE")
 
     if [ "$idx" -lt 0 ] || [ "$idx" -ge "$count" ]; then
-        echo -e "\033[31m[LỖI] Số thứ tự ($index_input) không tồn tại trong danh sách!\033[0m"
+        echo -e "${RED}[LỖI] Số thứ tự ($index_input) không tồn tại trong danh sách!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -322,7 +325,7 @@ delete_outbound() {
     read -p "Bạn có chắc chắn muốn xóa outbound '$target_tag' không? (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         jq --argjson i "$idx" 'del(.[$i])' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
-        echo -e "\033[32m[THÀNH CÔNG] Đã xóa outbound '$target_tag' khỏi hệ thống!\033[0m"
+        log_success "Đã xóa outbound '$target_tag' khỏi hệ thống!"
         
         if declare -f build_and_apply_config > /dev/null; then
             build_and_apply_config
@@ -333,4 +336,6 @@ delete_outbound() {
 
     read -p "Nhấn Enter để tiếp tục..."
 }
+
+# Khởi chạy menu của module
 render_outbound_menu

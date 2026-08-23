@@ -1,6 +1,11 @@
 #!/bin/bash
 
-API_CONFIG_FILE="/opt/menu-singbox-vvc/data/api_config.json"
+INSTALL_DIR="/opt/menu-singbox-vvc"
+if [ -f "$INSTALL_DIR/modules/utils.sh" ]; then
+    source "$INSTALL_DIR/modules/utils.sh"
+fi
+
+API_CONFIG_FILE="${INSTALL_DIR}/data/api_config.json"
 
 # Đảm bảo thư mục dữ liệu tồn tại
 mkdir -p "$(dirname "$API_CONFIG_FILE")"
@@ -9,9 +14,9 @@ mkdir -p "$(dirname "$API_CONFIG_FILE")"
 render_api_menu() {
     while true; do
         clear
-        echo "================================================================"
-        echo "||                  QUẢN LÝ API WEB TRUNG TÂM                 ||"
-        echo "================================================================"
+        echo -e "${BLUE}================================================================${NC}"
+        echo -e "${BLUE}||${NC}                  ${YELLOW}QUẢN LÝ API WEB TRUNG TÂM                 ${BLUE}||${NC}"
+        echo -e "${BLUE}================================================================${NC}"
         
         # Đọc cấu hình hiện tại
         local current_url="Chưa cấu hình"
@@ -32,21 +37,21 @@ render_api_menu() {
         fi
 
         # Kiểm tra trạng thái dịch vụ manager.service
-        local service_status="Đang dừng"
+        local service_status="${RED}Đang dừng${NC}"
         if systemctl is-active --quiet manager; then
-            service_status="Đang chạy"
+            service_status="${GREEN}Đang chạy${NC}"
         fi
 
-        echo " - URL Web Hiện Tại : $current_url"
-        echo " - Token Xác Thực   : $current_token"
-        echo " - Trạng Thái Daemon: $service_status"
-        echo "================================================================"
-        echo " 1. Thêm / Cập nhật URL & Token API"
-        echo " 2. Bật dịch vụ API Daemon (Manager)"
-        echo " 3. Tắt dịch vụ API Daemon (Manager)"
-        echo " 4. Kiểm tra kết nối tới Web Trung Tâm"
-        echo " 0. Quay lại Menu Chính"
-        echo "================================================================"
+        echo -e " - URL Web Hiện Tại : ${CYAN}$current_url${NC}"
+        echo -e " - Token Xác Thực   : ${PURPLE}$current_token${NC}"
+        echo -e " - Trạng Thái Daemon: $service_status"
+        echo -e "${BLUE}================================================================${NC}"
+        echo -e " ${GREEN}1.${NC} Thêm / Cập nhật URL & Token API"
+        echo -e " ${GREEN}2.${NC} Bật dịch vụ API Daemon (Manager)"
+        echo -e " ${GREEN}3.${NC} Tắt dịch vụ API Daemon (Manager)"
+        echo -e " ${GREEN}4.${NC} Kiểm tra kết nối tới Web Trung Tâm"
+        echo -e " ${RED}0.${NC} Quay lại Menu Chính"
+        echo -e "${BLUE}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-4]: " choice
 
         case "$choice" in
@@ -81,9 +86,9 @@ render_api_menu() {
 
 # Cấu hình nhập URL và Token
 configure_api_credentials() {
-    echo "--------------------------------------------------"
-    echo " NHẬP THÔNG TIN KẾT NỐI WEB TRUNG TÂM"
-    echo "--------------------------------------------------"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${YELLOW} NHẬP THÔNG TIN KẾT NỐI WEB TRUNG TÂM${NC}"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
     
     local old_url=""
     local old_token=""
@@ -109,7 +114,6 @@ configure_api_credentials() {
 
     log_success "Đã lưu cấu hình API thành công!"
     
-    # Khởi động lại service manager để nhận config mới nếu đang chạy
     if systemctl is-active --quiet manager; then
         systemctl restart manager
         log_info "Đã khởi động lại dịch vụ Manager để áp dụng thay đổi."
@@ -120,9 +124,9 @@ configure_api_credentials() {
 
 # Kiểm tra kết nối nhanh tới web trung tâm
 test_api_connection() {
-    echo "--------------------------------------------------"
-    echo " KIỂM TRA KẾT NỐI WEB TRUNG TÂM"
-    echo "--------------------------------------------------"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${YELLOW} KIỂM TRA KẾT NỐI WEB TRUNG TÂM${NC}"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
     if [ ! -f "$API_CONFIG_FILE" ]; then
         log_warn "Chưa có cấu hình API nào được lưu."
         read -p "Nhấn Enter để tiếp tục..."
@@ -151,4 +155,6 @@ test_api_connection() {
     fi
     read -p "Nhấn Enter để tiếp tục..."
 }
+
+# Khởi chạy menu của module
 render_api_menu
