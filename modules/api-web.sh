@@ -21,12 +21,17 @@ render_api_menu() {
         # Đọc cấu hình hiện tại
         local current_url="Chưa cấu hình"
         local current_token="Chưa cấu hình"
+        local current_port="Chưa cấu hình"
         if [ -f "$API_CONFIG_FILE" ]; then
             local url_val
             url_val=$(jq -r '.url // empty' "$API_CONFIG_FILE" 2>/dev/null)
             local token_val
             token_val=$(jq -r '.token // empty' "$API_CONFIG_FILE" 2>/dev/null)
+            local port_val
+            port_val=$(jq -r '.port // empty' "$API_CONFIG_FILE" 2>/dev/null)
+            
             [ -n "$url_val" ] && current_url="$url_val"
+            [ -n "$port_val" ] && current_port="$port_val"
             if [ -n "$token_val" ]; then
                 if [ ${#token_val} -gt 6 ]; then
                     current_token="${token_val:0:6}..."
@@ -43,10 +48,11 @@ render_api_menu() {
         fi
 
         echo -e " - URL Web Hiện Tại : ${CYAN}$current_url${NC}"
+        echo -e " - API Port Node    : ${GREEN}$current_port${NC}"
         echo -e " - Token Xác Thực   : ${PURPLE}$current_token${NC}"
         echo -e " - Trạng Thái Daemon: $service_status"
         echo -e "${BLUE}================================================================${NC}"
-        echo -e " ${GREEN}1.${NC} Thêm / Cập nhật URL & Token API"
+        echo -e " ${GREEN}1.${NC} Thêm / Cập nhật URL, Port & Token API"
         echo -e " ${GREEN}2.${NC} Bật dịch vụ API Daemon (Manager)"
         echo -e " ${GREEN}3.${NC} Tắt dịch vụ API Daemon (Manager)"
         echo -e " ${GREEN}4.${NC} Kiểm tra kết nối tới Web Trung Tâm"
@@ -84,7 +90,7 @@ render_api_menu() {
     done
 }
 
-# Cấu hình nhập URL và Token
+# Cấu hình nhập URL, Port và Token
 configure_api_credentials() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
     echo -e "${YELLOW} NHẬP THÔNG TIN KẾT NỐI WEB TRUNG TÂM${NC}"
@@ -92,25 +98,30 @@ configure_api_credentials() {
     
     local old_url=""
     local old_token=""
+    local old_port=""
     if [ -f "$API_CONFIG_FILE" ]; then
         old_url=$(jq -r '.url // ""' "$API_CONFIG_FILE" 2>/dev/null)
         old_token=$(jq -r '.token // ""' "$API_CONFIG_FILE" 2>/dev/null)
+        old_port=$(jq -r '.port // ""' "$API_CONFIG_FILE" 2>/dev/null)
     fi
 
     read -p "Nhập URL Web Trung Tâm [Mặc định: $old_url]: " input_url
     input_url="${input_url:-$old_url}"
 
+    read -p "Nhập Port API của Node trên Web [Mặc định: $old_port]: " input_port
+    input_port="${input_port:-$old_port}"
+
     read -p "Nhập Token Xác Thực [Giữ nguyên nếu bỏ trống]: " input_token
     input_token="${input_token:-$old_token}"
 
-    if [ -z "$input_url" ]; then
-        log_warn "URL không được để trống!"
+    if [ -z "$input_url" ] || [ -z "$input_port" ]; then
+        log_warn "URL và Port không được để trống!"
         sleep 2
         return
     fi
 
-    # Ghi tệp JSON an toàn bằng jq
-    jq -n --arg u "$input_url" --arg t "$input_token" '{url: $u, token: $t}' > "$API_CONFIG_FILE"
+    # Ghi tệp JSON an toàn bằng jq (bao gồm cả port dạng số)
+    jq -n --arg u "$input_url" --arg t "$input_token" --arg p "$input_port" '{url: $u, token: $t, port: ($p | tonumber)}' > "$API_CONFIG_FILE"
 
     log_success "Đã lưu cấu hình API thành công!"
     
@@ -122,7 +133,7 @@ configure_api_credentials() {
     read -p "Nhấn Enter để tiếp tục..."
 }
 
-# Kiểm tra kết nối nhanh tới web trung tâm
+# Kiểm tra kết nối nhanh tới web trung tâm kèm theo chuẩn header mới
 test_api_connection() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
     echo -e "${YELLOW} KIỂM TRA KẾT NỐI WEB TRUNG TÂM${NC}"
@@ -137,21 +148,28 @@ test_api_connection() {
     url=$(jq -r '.url // ""' "$API_CONFIG_FILE" 2>/dev/null)
     local token
     token=$(jq -r '.token // ""' "$API_CONFIG_FILE" 2>/dev/null)
+    local port
+    port=$(jq -r '.port // ""' "$API_CONFIG_FILE" 2>/dev/null)
 
-    if [ -z "$url" ]; then
-        log_warn "URL trống, không thể kiểm tra."
+    if [ -z "$url" ] || [ -z "$port" ]; then
+        log_warn "URL hoặc Port trống, không thể kiểm tra."
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
     log_info "Đang gửi tín hiệu kiểm tra tới: $url ..."
     local response
-    response=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $token" "$url/sync-commands")
+    # Gửi đúng chuẩn header X-API-Port và X-API-Token mà node_sync.php yêu cầu
+    response=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Content-Type: application/json" \
+        -H "X-API-Port: $port" \
+        -H "X-API-Token: $token" \
+        -d '{"action":"get_tasks"}' "$url")
     
     if [ "$response" = "200" ] || [ "$response" = "401" ]; then
         log_success "Kết nối thành công tới Web Trung Tâm! (Mã phản hồi HTTP: $response)"
     else
-        log_warn "Không thể kết nối ổn định (Mã phản hồi HTTP: $response). Vui lòng kiểm tra lại URL hoặc Token."
+        log_warn "Không thể kết nối ổn định (Mã phản hồi HTTP: $response). Vui lòng kiểm tra lại URL, Port hoặc Token."
     fi
     read -p "Nhấn Enter để tiếp tục..."
 }

@@ -21,15 +21,17 @@ const (
 
 var (
 	usersFile     = filepath.Join(DataDir, "users.json")
+	nodesFile     = filepath.Join(DataDir, "nodes.json")
 	entryNodeFile = filepath.Join(DataDir, "entry-node.json")
 	apiConfigFile = filepath.Join(DataDir, "api_config.json")
 	fileMutex     sync.Mutex
 )
 
-// Cấu hình API Web trung tâm đọc từ tệp do api-web.sh quản lý
+// Cấu hình API Web trung tâm đọc từ tệp hệ thống
 type ApiConfig struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
+	Port  int    `json:"port"`
 }
 
 // Dữ liệu User theo chuẩn file JSON
@@ -37,7 +39,8 @@ type User struct {
 	Username string `json:"username"`
 	UUID     string `json:"uuid,omitempty"`
 	Password string `json:"password,omitempty"`
-	Protocol string `json:"protocol"`
+	Protocol string `json:"protocol,omitempty"`
+	Type     string `json:"type,omitempty"`
 	Port     int    `json:"port"`
 	Tag      string `json:"tag"`
 }
@@ -54,15 +57,16 @@ type ResetResponse struct {
 	NewLink string `json:"new_link,omitempty"`
 }
 
-// Cấu trúc Lệnh đồng bộ nhận từ Web trung tâm
-type ServerCommand struct {
-	Action string          `json:"action"` // add_user, delete_user, toggle_service...
-	Params json.RawMessage `json:"params"`
+// Cấu trúc Task nhận từ Web trung tâm qua action get_tasks
+type Task struct {
+	ID      int    `json:"id"`
+	Action  string `json:"action"`
+	Payload string `json:"payload"`
 }
 
-type SyncResponse struct {
-	Status   string          `json:"status"`
-	Commands []ServerCommand `json:"commands"`
+type TasksResponse struct {
+	Status string `json:"status"`
+	Tasks  []Task `json:"tasks"`
 }
 
 // Cấu trúc Entry Node để thay thế IP/Port trước khi trả link
@@ -75,7 +79,7 @@ type EntryNode struct {
 func main() {
 	os.MkdirAll(DataDir, 0755)
 
-	// Chạy tiến trình đồng bộ tổng hợp (Vừa đẩy traffic, vừa nhận lệnh mỗi 1 phút)
+	// Chạy tiến trình đồng bộ tổng hợp với node_sync.php (Đẩy inbounds, traffic, nhận task mỗi 1 phút)
 	go systemSyncRoutine()
 
 	// Mở HTTP API Server chờ lệnh tức thời từ Web trung tâm (ví dụ: Reset Token)
@@ -88,29 +92,68 @@ func main() {
 }
 
 // Đọc cấu hình API động từ tệp cấu hình của hệ thống
-func getApiConfig() (string, string) {
+func getApiConfig() (string, string, int) {
 	data, err := os.ReadFile(apiConfigFile)
 	if err != nil {
-		return "", ""
+		return "", "", 0
 	}
 	var config ApiConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		return "", ""
+		return "", "", 0
 	}
-	return config.URL, config.Token
+	return config.URL, config.Token, config.Port
 }
 
-// Xử lý yêu cầu reset từ web trung tâm (Có kiểm tra Token xác thực)
+// Helper gửi request POST chung đến node_sync.php theo chuẩn Header X-API-Port và X-API-Token
+func sendApiRequest(action string, payload map[string]interface{}, result interface{}) error {
+	baseURL, token, port := getApiConfig()
+	if baseURL == "" || token == "" {
+		return fmt.Errorf("chưa cấu hình API URL hoặc Token")
+	}
+
+	payload["action"] = action
+	jsonBody, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Port", fmt.Sprintf("%d", port))
+	req.Header.Set("X-API-Token", token)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API trả về mã lỗi HTTP: %d", resp.StatusCode)
+	}
+
+	if result != nil {
+		return json.NewDecoder(resp.Body).Decode(result)
+	}
+	return nil
+}
+
+// Xử lý yêu cầu reset từ web trung tâm
 func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Xác thực Token từ Header (Bearer Token)
-	_, serverToken := getApiConfig()
+	// Xác thực Token từ Header tương thích cả Bearer lẫn X-API-Token
+	_, serverToken, _ := getApiConfig()
 	clientToken := r.Header.Get("Authorization")
-	if serverToken != "" && clientToken != "Bearer "+serverToken {
+	if serverToken != "" && clientToken != "Bearer "+serverToken && r.Header.Get("X-API-Token") != serverToken {
 		sendJSONResponse(w, "error", "Unauthorized: Token không hợp lệ", "")
 		return
 	}
@@ -160,110 +203,92 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	sendJSONResponse(w, "success", "Reset thành công", newLink)
 }
 
-// TIẾN TRÌNH ĐỒNG BỔ TỔNG HỢP (CHẠY MỖI 1 PHÚT)
+// TIẾN TRÌNH ĐỒNG BỘ TỔNG HỢP VỚI node_sync.php (CHẠY MỖI 1 PHÚT)
 func systemSyncRoutine() {
 	ticker := time.NewTicker(1 * time.Minute)
 	for range ticker.C {
-		baseURL, token := getApiConfig()
+		baseURL, token, _ := getApiConfig()
 		if baseURL == "" || token == "" {
 			continue
 		}
 
-		client := &http.Client{Timeout: 15 * time.Second}
-
-		// --- 1. Đẩy dữ liệu Traffic lên web kèm Token ---
+		// --- 1. Đẩy danh sách Inbounds lên node_sync.php (action: report_inbounds) ---
 		func() {
-			payload := map[string]interface{}{
-				"timestamp": time.Now().Unix(),
+			var inbounds []map[string]interface{}
+			if data, err := os.ReadFile(nodesFile); err == nil {
+				json.Unmarshal(data, &inbounds)
 			}
-			jsonBody, _ := json.Marshal(payload)
-
-			req, err := http.NewRequest("POST", baseURL+"/push-traffic", bytes.NewBuffer(jsonBody))
-			if err != nil {
-				return
+			if len(inbounds) > 0 {
+				var res map[string]interface{}
+				_ = sendApiRequest("report_inbounds", map[string]interface{}{
+					"inbounds": inbounds,
+				}, &res)
 			}
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err := client.Do(req)
-			if err != nil {
-				return
-			}
-			defer resp.Body.Close()
 		}()
 
-		// --- 2. Kiểm tra và nhận danh sách lệnh mới từ web kèm Token ---
+		// --- 2. Kiểm tra và nhận danh sách Task từ node_sync.php (action: get_tasks) ---
 		func() {
-			req, err := http.NewRequest("GET", baseURL+"/sync-commands", nil)
-			if err != nil {
-				return
-			}
-			req.Header.Set("Authorization", "Bearer "+token)
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err := client.Do(req)
-			if err != nil {
-				return
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode == http.StatusOK {
-				var syncResp SyncResponse
-				if json.NewDecoder(resp.Body).Decode(&syncResp) == nil {
-					for _, cmd := range syncResp.Commands {
-						executeCommand(cmd)
-					}
+			var taskResp TasksResponse
+			err := sendApiRequest("get_tasks", map[string]interface{}{}, &taskResp)
+			if err == nil && len(taskResp.Tasks) > 0 {
+				for _, task := range taskResp.Tasks {
+					executeTask(task)
 				}
 			}
+		}()
+
+		// --- 3. Đẩy dữ liệu Traffic lên node_sync.php (action: report_traffic) ---
+		func() {
+			logs := []map[string]interface{}{}
+			_ = sendApiRequest("report_traffic", map[string]interface{}{
+				"logs": logs,
+			}, nil)
 		}()
 	}
 }
 
-// Thực thi các lệnh nhận từ web (Thêm user, Xóa user, Tắt/Bật mạng...)
-func executeCommand(cmd ServerCommand) {
+// Thực thi các lệnh task nhận từ web
+func executeTask(task Task) {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 
-	switch cmd.Action {
-	case "add_user":
-		var newUser User
-		if json.Unmarshal(cmd.Params, &newUser) == nil {
-			users, _ := readUsers()
-			users = append(users, newUser)
-			writeUsers(users)
-			go reloadSingbox()
-			log.Printf("[SYNC] Đã thêm user mới từ web: %s", newUser.Username)
-		}
-	case "delete_user":
-		var params struct {
-			Username string `json:"username"`
-		}
-		if json.Unmarshal(cmd.Params, &params) == nil {
-			users, _ := readUsers()
-			var filtered []User
-			for _, u := range users {
-				if u.Username != params.Username {
-					filtered = append(filtered, u)
-				}
-			}
-			writeUsers(filtered)
-			go reloadSingbox()
-			log.Printf("[SYNC] Đã xóa user từ web: %s", params.Username)
-		}
-	case "toggle_service":
-		var params struct {
-			State string `json:"state"` // "start" hoặc "stop"
-		}
-		if json.Unmarshal(cmd.Params, &params) == nil {
-			if params.State == "stop" {
-				exec.Command("systemctl", "stop", "sing-box").Run()
-				log.Println("[SYNC] Nhận lệnh từ web: Đã tắt mạng (dừng sing-box).")
-			} else if params.State == "start" {
-				exec.Command("systemctl", "start", "sing-box").Run()
-				log.Println("[SYNC] Nhận lệnh từ web: Đã bật mạng (khởi động sing-box).")
-			}
-		}
+	var payload map[string]interface{}
+	_ = json.Unmarshal([]byte(task.Payload), &payload)
+
+	actionType := payload["action"]
+	if actionType == nil {
+		actionType = task.Action
 	}
+
+	var taskStatus = "done"
+	var errorMsg *string
+
+	switch actionType {
+	case "toggle_user":
+		username, _ := payload["username"].(string)
+		status, _ := payload["status"].(string)
+		log.Printf("[TASK] Nhận lệnh toggle_user cho %s với trạng thái %s", username, status)
+
+	case "toggle_service":
+		state, _ := payload["state"].(string)
+		if state == "stop" {
+			exec.Command("systemctl", "stop", "sing-box").Run()
+			log.Println("[TASK] Đã tắt dịch vụ sing-box theo lệnh từ web.")
+		} else if state == "start" {
+			exec.Command("systemctl", "start", "sing-box").Run()
+			log.Println("[TASK] Đã bật dịch vụ sing-box theo lệnh từ web.")
+		}
+
+	default:
+		log.Printf("[TASK] Hành động không hỗ trợ: %v", actionType)
+	}
+
+	// Báo cáo kết quả task về node_sync.php (action: update_task_status)
+	_ = sendApiRequest("update_task_status", map[string]interface{}{
+		"task_id":     task.ID,
+		"task_status": taskStatus,
+		"error_msg":   errorMsg,
+	}, nil)
 }
 
 func sendJSONResponse(w http.ResponseWriter, status, message, link string) {
@@ -313,30 +338,29 @@ func getEntryNodeInfo(tag string, defaultPort int) (string, int) {
 
 func generateProxyLink(u User) string {
 	domain, port := getEntryNodeInfo(u.Tag, u.Port)
+	proto := u.Protocol
+	if proto == "" {
+		proto = u.Type
+	}
 
-	switch u.Protocol {
+	switch proto {
 	case "vless", "vless-reality":
-		// Chuẩn VLESS TCP Reality
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
 			u.UUID, domain, port, domain, u.Username)
 
-	case "vless-grpc":
-		// Chuẩn VLESS gRPC Reality
+	case "vless-grpc", "vless-grpc-reality":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=grpc&security=reality&serviceName=grpc&sni=%s#%s",
 			u.UUID, domain, port, domain, u.Username)
 
-	case "vless-ws":
-		// Chuẩn VLESS WebSocket TLS
+	case "vless-ws", "vless-ws-tls":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=ws&security=tls&path=/vless&sni=%s#%s",
 			u.UUID, domain, port, domain, u.Username)
 
 	case "hysteria2", "hy2":
-		// Chuẩn Hysteria2
 		return fmt.Sprintf("hy2://%s@%s:%d?sni=%s&insecure=1#%s",
 			u.Password, domain, port, domain, u.Username)
 
 	case "tuic":
-		// Chuẩn TUIC
 		return fmt.Sprintf("tuic://%s:%s@%s:%d?sni=%s&congestion_control=bbr#%s",
 			u.UUID, u.Password, domain, port, domain, u.Username)
 
