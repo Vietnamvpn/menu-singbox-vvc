@@ -22,7 +22,7 @@ render_entry_node_menu() {
         echo -e " ${GREEN}1.${NC} Thêm Entry Node"
         echo -e " ${GREEN}2.${NC} Sửa Entry Node"
         echo -e " ${GREEN}3.${NC} Xóa Entry Node"
-        echo -e " ${RED}0.${NC} Quay lại Menu Chính"
+        echo -e "${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-3]: " choice
 
@@ -55,20 +55,21 @@ list_entry_nodes_table() {
         return
     fi
     
-    echo -e "${CYAN}----------------------------------------------------------------${NC}"
-    printf "${CYAN}%-4s${NC} | ${GREEN}%-20s${NC} | ${YELLOW}%-25s${NC} | ${BLUE}%-8s${NC}\n" "STT" "Tên (Tag)" "Địa chỉ (IP/Domain)" "Cổng"
-    echo -e "${CYAN}----------------------------------------------------------------${NC}"
+    echo -e "${CYAN}----------------------------------------------------------------------------------------${NC}"
+    printf "${CYAN}%-4s${NC} | ${GREEN}%-18s${NC} | ${YELLOW}%-20s${NC} | ${BLUE}%-6s${NC} | ${PURPLE}%-20s${NC}\n" "STT" "Tên Entry" "Địa chỉ (IP/Domain)" "Cổng" "Liên kết Node"
+    echo -e "${CYAN}----------------------------------------------------------------------------------------${NC}"
     
     local count
     count=$(jq length "$ENTRY_NODE_FILE")
     for ((i=0; i<count; i++)); do
-        local tag address port
+        local tag address port node_tag
         tag=$(jq -r --argjson idx "$i" '.[$idx].tag // "N/A"' "$ENTRY_NODE_FILE")
         address=$(jq -r --argjson idx "$i" '.[$idx].address // "N/A"' "$ENTRY_NODE_FILE")
         port=$(jq -r --argjson idx "$i" '.[$idx].port // "N/A"' "$ENTRY_NODE_FILE")
-        printf "%-4d | %-20s | %-25s | %-8s\n" "$((i+1))" "$tag" "$address" "$port"
+        node_tag=$(jq -r --argjson idx "$i" '.[$idx].node_tag // "N/A"' "$ENTRY_NODE_FILE")
+        printf "%-4d | %-18s | %-20s | %-6s | %-20s\n" "$((i+1))" "$tag" "$address" "$port" "$node_tag"
     done
-    echo -e "${CYAN}----------------------------------------------------------------${NC}"
+    echo -e "${CYAN}----------------------------------------------------------------------------------------${NC}"
 }
 
 # Thêm entry node mới
@@ -77,7 +78,18 @@ add_entry_node() {
     echo -e "${YELLOW} THÊM ENTRY NODE${NC}"
     echo -e "${CYAN}--------------------------------------------------${NC}"
     
-    read -p "Nhập Tên / Tag định danh (vd: entry-us-1): " tag
+    local nodes_file="${INSTALL_DIR}/data/nodes.json"
+    if [ ! -s "$nodes_file" ] || [ "$(jq length "$nodes_file" 2>/dev/null)" -eq 0 ]; then
+        echo -e "${RED}[LỖI] Chưa có Node (Inbound) nào trong hệ thống! Vui lòng tạo node trước.${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    echo -e "${CYAN}Danh sách Node (Inbound) hiện có:${NC}"
+    jq -r '.[] | " - Tag: \(.tag) [Loại: \(.type)]"' "$nodes_file"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+
+    read -p "Nhập Tên / Tag định danh cho Entry Node (vd: entry-us-1): " tag
     if [ -z "$tag" ]; then
         echo -e "${RED}[LỖI] Tên / Tag không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
@@ -92,24 +104,39 @@ add_entry_node() {
         return
     fi
 
-    read -p "Nhập Domain hoặc Địa chỉ IP: " address
+    read -p "Nhập Tag của Node cần liên kết (Node Tag tương ứng): " node_tag
+    if [ -z "$node_tag" ]; then
+        echo -e "${RED}[LỖI] Node Tag không được để trống!${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    local node_exists
+    node_exists=$(jq --arg nt "$node_tag" '[.[] | select(.tag == $nt)] | length' "$nodes_file")
+    if [ "$node_exists" -eq 0 ]; then
+        echo -e "${RED}[LỖI] Node Tag '$node_tag' không tồn tại trong hệ thống!${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    read -p "Nhập Domain hoặc Địa chỉ IP của Entry Node: " address
     if [ -z "$address" ]; then
         echo -e "${RED}[LỖI] Địa chỉ không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
-    read -p "Nhập Cổng (Port): " port
+    read -p "Nhập Cổng (Port) của Entry Node: " port
     if ! [[ "$port" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}[LỖI] Cổng (Port) phải là một số nguyên hợp lệ!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
-    jq --arg t "$tag" --arg addr "$address" --argjson p "$port" \
-       '. += [{"tag": $t, "address": $addr, "port": $p}]' "$ENTRY_NODE_FILE" > "$ENTRY_NODE_FILE.tmp" && mv "$ENTRY_NODE_FILE.tmp" "$ENTRY_NODE_FILE"
+    jq --arg t "$tag" --arg addr "$address" --argjson p "$port" --arg nt "$node_tag" \
+       '. += [{"tag": $t, "address": $addr, "port": $p, "node_tag": $nt}]' "$ENTRY_NODE_FILE" > "$ENTRY_NODE_FILE.tmp" && mv "$ENTRY_NODE_FILE.tmp" "$ENTRY_NODE_FILE"
 
-    log_success "Đã thêm entry node '$tag' thành công!"
+    log_success "Đã thêm entry node '$tag' liên kết với node '$node_tag' thành công!"
     read -p "Nhấn Enter để tiếp tục..."
 }
 
@@ -144,10 +171,11 @@ edit_entry_node() {
         return
     fi
 
-    local old_tag old_address old_port
+    local old_tag old_address old_port old_node_tag
     old_tag=$(jq -r --argjson i "$idx" '.[$i].tag' "$ENTRY_NODE_FILE")
     old_address=$(jq -r --argjson i "$idx" '.[$i].address' "$ENTRY_NODE_FILE")
     old_port=$(jq -r --argjson i "$idx" '.[$i].port' "$ENTRY_NODE_FILE")
+    old_node_tag=$(jq -r --argjson i "$idx" '.[$i].node_tag // ""' "$ENTRY_NODE_FILE")
 
     echo -e "Đang sửa Entry Node: ${CYAN}$old_tag${NC}"
     
@@ -159,6 +187,26 @@ edit_entry_node() {
         exists=$(jq --arg t "$new_tag" '[.[] | select(.tag == $t)] | length' "$ENTRY_NODE_FILE")
         if [ "$exists" -gt 0 ]; then
             echo -e "${RED}[LỖI] Tag '$new_tag' đã bị trùng với entry node khác!${NC}"
+            read -p "Nhấn Enter để tiếp tục..."
+            return
+        fi
+    fi
+
+    local nodes_file="${INSTALL_DIR}/data/nodes.json"
+    echo -e "${CYAN}Danh sách Node (Inbound) hiện có:${NC}"
+    if [ -f "$nodes_file" ]; then
+        jq -r '.[] | " - Tag: \(.tag) [Loại: \(.type)]"' "$nodes_file"
+    fi
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+
+    read -p "Nhập Node Tag liên kết mới [Mặc định: $old_node_tag]: " new_node_tag
+    new_node_tag="${new_node_tag:-$old_node_tag}"
+
+    if [ -n "$new_node_tag" ] && [ -f "$nodes_file" ]; then
+        local node_exists
+        node_exists=$(jq --arg nt "$new_node_tag" '[.[] | select(.tag == $nt)] | length' "$nodes_file")
+        if [ "$node_exists" -eq 0 ]; then
+            echo -e "${RED}[LỖI] Node Tag '$new_node_tag' không tồn tại trong hệ thống!${NC}"
             read -p "Nhấn Enter để tiếp tục..."
             return
         fi
@@ -176,8 +224,8 @@ edit_entry_node() {
         return
     fi
 
-    jq --argjson i "$idx" --arg t "$new_tag" --arg addr "$new_address" --argjson p "$new_port" \
-       '.[$i] = {"tag": $t, "address": $addr, "port": $p}' "$ENTRY_NODE_FILE" > "$ENTRY_NODE_FILE.tmp" && mv "$ENTRY_NODE_FILE.tmp" "$ENTRY_NODE_FILE"
+    jq --argjson i "$idx" --arg t "$new_tag" --arg addr "$new_address" --argjson p "$new_port" --arg nt "$new_node_tag" \
+       '.[$i] = {"tag": $t, "address": $addr, "port": $p, "node_tag": $nt}' "$ENTRY_NODE_FILE" > "$ENTRY_NODE_FILE.tmp" && mv "$ENTRY_NODE_FILE.tmp" "$ENTRY_NODE_FILE"
 
     log_success "Đã cập nhật entry node thành công!"
     read -p "Nhấn Enter để tiếp tục..."
