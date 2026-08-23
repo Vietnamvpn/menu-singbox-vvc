@@ -27,39 +27,29 @@ var (
 	fileMutex     sync.Mutex
 )
 
-// Cấu hình API Web trung tâm đọc từ tệp hệ thống
 type ApiConfig struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
 	Port  int    `json:"port"`
 }
 
-// Dữ liệu User theo chuẩn file JSON (hỗ trợ cả UUID, Password và Secret)
+// Cấu trúc User chuẩn khớp với users.json trên VPS
 type User struct {
 	Username string `json:"username"`
-	UUID     string `json:"uuid,omitempty"`
-	Password string `json:"password,omitempty"`
-	Secret   string `json:"secret,omitempty"`
-	Protocol string `json:"protocol,omitempty"`
-	Type     string `json:"type,omitempty"`
-	Port     int    `json:"port,omitempty"`
-	Tag      string `json:"tag,omitempty"`
-	Status   string `json:"status,omitempty"`
+	Tag      string `json:"tag"`
+	Secret   string `json:"secret"`
 }
 
-// Request từ Web trung tâm gửi sang để reset
 type ResetRequest struct {
 	Username string `json:"username"`
 }
 
-// Response trả về Web trung tâm
 type ResetResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 	NewLink string `json:"new_link,omitempty"`
 }
 
-// Cấu trúc Task nhận từ Web trung tâm qua action get_tasks
 type Task struct {
 	ID      int    `json:"id"`
 	Action  string `json:"action"`
@@ -71,7 +61,6 @@ type TasksResponse struct {
 	Tasks  []Task `json:"tasks"`
 }
 
-// Cấu trúc Entry Node để thay thế IP/Port trước khi trả link
 type EntryNode struct {
 	Tag    string `json:"tag"`
 	Domain string `json:"domain"`
@@ -81,10 +70,10 @@ type EntryNode struct {
 func main() {
 	os.MkdirAll(DataDir, 0755)
 
-	// Chạy tiến trình đồng bộ tổng hợp với node_sync.php (Đẩy inbounds, traffic, nhận task mỗi 1 phút)
+	// Tiến trình đồng bộ định kỳ (1 phút/lần)
 	go systemSyncRoutine()
 
-	// Mở HTTP API Server chờ lệnh tức thời từ Web trung tâm (ví dụ: Reset Token)
+	// HTTP API Endpoint chờ lệnh reset password
 	http.HandleFunc("/api/reset-password", handleResetPassword)
 
 	log.Printf("Sing-box Manager API Server đang chạy tại port %s", ListenAddr)
@@ -93,7 +82,6 @@ func main() {
 	}
 }
 
-// Đọc cấu hình API động từ tệp cấu hình của hệ thống
 func getApiConfig() (string, string, int) {
 	data, err := os.ReadFile(apiConfigFile)
 	if err != nil {
@@ -106,7 +94,6 @@ func getApiConfig() (string, string, int) {
 	return config.URL, config.Token, config.Port
 }
 
-// Helper gửi request POST chung đến node_sync.php theo chuẩn Header X-API-Port và X-API-Token
 func sendApiRequest(action string, payload map[string]interface{}, result interface{}) error {
 	baseURL, token, port := getApiConfig()
 	if baseURL == "" || token == "" {
@@ -145,14 +132,12 @@ func sendApiRequest(action string, payload map[string]interface{}, result interf
 	return nil
 }
 
-// Xử lý yêu cầu reset từ web trung tâm
 func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Xác thực Token từ Header tương thích cả Bearer lẫn X-API-Token
 	_, serverToken, _ := getApiConfig()
 	clientToken := r.Header.Get("Authorization")
 	if serverToken != "" && clientToken != "Bearer "+serverToken && r.Header.Get("X-API-Token") != serverToken {
@@ -178,15 +163,7 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	var foundUser *User
 	for i := range users {
 		if users[i].Username == req.Username {
-			if users[i].UUID != "" {
-				users[i].UUID = generateUUID()
-			}
-			if users[i].Password != "" {
-				users[i].Password = generateRandomString(16)
-			}
-			if users[i].Secret != "" {
-				users[i].Secret = generateUUID()
-			}
+			users[i].Secret = generateUUID()
 			foundUser = &users[i]
 			break
 		}
@@ -208,7 +185,6 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	sendJSONResponse(w, "success", "Reset thành công", newLink)
 }
 
-// TIẾN TRÌNH ĐỒNG BỘ TỔNG HỢP VỚI node_sync.php (CHẠY MỖI 1 PHÚT)
 func systemSyncRoutine() {
 	ticker := time.NewTicker(1 * time.Minute)
 	for range ticker.C {
@@ -217,7 +193,6 @@ func systemSyncRoutine() {
 			continue
 		}
 
-		// --- 1. Đẩy danh sách Inbounds lên node_sync.php (action: report_inbounds) ---
 		func() {
 			var inbounds []map[string]interface{}
 			if data, err := os.ReadFile(nodesFile); err == nil {
@@ -231,7 +206,6 @@ func systemSyncRoutine() {
 			}
 		}()
 
-		// --- 2. Kiểm tra và nhận danh sách Task từ node_sync.php (action: get_tasks) ---
 		func() {
 			var taskResp TasksResponse
 			err := sendApiRequest("get_tasks", map[string]interface{}{}, &taskResp)
@@ -242,7 +216,6 @@ func systemSyncRoutine() {
 			}
 		}()
 
-		// --- 3. Đẩy dữ liệu Traffic lên node_sync.php (action: report_traffic) ---
 		func() {
 			logs := []map[string]interface{}{}
 			_ = sendApiRequest("report_traffic", map[string]interface{}{
@@ -252,17 +225,14 @@ func systemSyncRoutine() {
 	}
 }
 
-// Thực thi các lệnh task nhận từ web (Đã bổ sung ghi log ra file debug_task.json)
 func executeTask(task Task) {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 
-	// --- Ghi lại task nhận được từ web ra tệp để kiểm tra ---
 	debugFile := filepath.Join(DataDir, "debug_task.json")
 	if debugData, err := json.MarshalIndent(task, "", "  "); err == nil {
 		_ = os.WriteFile(debugFile, debugData, 0644)
 	}
-	// -----------------------------------------------------
 
 	var payload map[string]interface{}
 	if task.Payload != "" {
@@ -279,71 +249,60 @@ func executeTask(task Task) {
 
 	switch actionType {
 	case "add_user", "create_user":
-		var newUser User
-		if payloadBytes, err := json.Marshal(payload); err == nil {
-			_ = json.Unmarshal(payloadBytes, &newUser)
-		}
-		if newUser.Username == "" {
-			if un, ok := payload["username"].(string); ok {
-				newUser.Username = un
-			}
-		}
+		username, _ := payload["username"].(string)
 
-		// Tự động đồng bộ UUID/Password/Secret để áp dụng cho mọi giao thức khi web chỉ truyền uuid
-		if newUser.UUID != "" {
-			if newUser.Password == "" {
-				newUser.Password = newUser.UUID
-			}
-			if newUser.Secret == "" {
-				newUser.Secret = newUser.UUID
-			}
-		} else if newUser.Password != "" {
-			if newUser.UUID == "" {
-				newUser.UUID = newUser.Password
-			}
-			if newUser.Secret == "" {
-				newUser.Secret = newUser.Password
-			}
-		} else if newUser.Secret != "" {
-			if newUser.UUID == "" {
-				newUser.UUID = newUser.Secret
-			}
-			if newUser.Password == "" {
-				newUser.Password = newUser.Secret
-			}
+		// Lấy giá trị secret/uuid từ payload web gửi xuống
+		var secret string
+		if s, ok := payload["secret"].(string); ok && s != "" {
+			secret = s
+		} else if u, ok := payload["uuid"].(string); ok && u != "" {
+			secret = u
+		} else if p, ok := payload["password"].(string); ok && p != "" {
+			secret = p
 		} else {
-			uID := generateUUID()
-			newUser.UUID = uID
-			newUser.Password = uID
-			newUser.Secret = uID
+			secret = generateUUID()
 		}
 
-		if newUser.Username != "" {
+		if username != "" {
 			users, err := readUsers()
 			if err != nil {
 				users = []User{}
 			}
+
 			exists := false
 			for i, u := range users {
-				if u.Username == newUser.Username {
-					users[i] = newUser
+				if u.Username == username {
+					users[i].Secret = secret
+					if users[i].Tag == "" {
+						users[i].Tag = "all"
+					}
 					exists = true
 					break
 				}
 			}
+
 			if !exists {
-				users = append(users, newUser)
+				tag := "all"
+				if t, ok := payload["tag"].(string); ok && t != "" {
+					tag = t
+				}
+				users = append(users, User{
+					Username: username,
+					Tag:      tag,
+					Secret:   secret,
+				})
 			}
+
 			if err := writeUsers(users); err == nil {
-				log.Printf("[TASK] Đã thêm/cập nhật user từ web: %s", newUser.Username)
-				go reloadSingbox()
+				log.Printf("[TASK] Đã thêm/cập nhật user từ web: %s", username)
+				go reloadSingbox() // Gọi build_and_apply_config trong utils.sh
 			} else {
 				errMsg := err.Error()
 				errorMsg = &errMsg
 				taskStatus = "error"
 			}
 		} else {
-			errMsg := "Username trống trong payload add_user"
+			errMsg := "Username trống trong payload"
 			errorMsg = &errMsg
 			taskStatus = "error"
 		}
@@ -375,41 +334,10 @@ func executeTask(task Task) {
 			}
 		}
 
-	case "toggle_user":
-		username, _ := payload["username"].(string)
-		status, _ := payload["status"].(string)
-		log.Printf("[TASK] Nhận lệnh toggle_user cho %s với trạng thái %s", username, status)
-		users, err := readUsers()
-		if err == nil {
-			updated := false
-			for i := range users {
-				if users[i].Username == username {
-					users[i].Status = status
-					updated = true
-					break
-				}
-			}
-			if updated {
-				writeUsers(users)
-				go reloadSingbox()
-			}
-		}
-
-	case "toggle_service":
-		state, _ := payload["state"].(string)
-		if state == "stop" {
-			exec.Command("systemctl", "stop", "sing-box").Run()
-			log.Println("[TASK] Đã tắt dịch vụ sing-box theo lệnh từ web.")
-		} else if state == "start" {
-			exec.Command("systemctl", "start", "sing-box").Run()
-			log.Println("[TASK] Đã bật dịch vụ sing-box theo lệnh từ web.")
-		}
-
 	default:
 		log.Printf("[TASK] Hành động không hỗ trợ: %v", actionType)
 	}
 
-	// Báo cáo kết quả task về node_sync.php (action: update_task_status)
 	_ = sendApiRequest("update_task_status", map[string]interface{}{
 		"task_id":     task.ID,
 		"task_status": taskStatus,
@@ -447,7 +375,7 @@ func writeUsers(users []User) error {
 	return os.WriteFile(usersFile, data, 0644)
 }
 
-func getEntryNodeInfo(tag string, defaultPort int) (string, int) {
+func getEntryNodeInfo(tag string) (string, int) {
 	data, err := os.ReadFile(entryNodeFile)
 	if err == nil {
 		var entries []EntryNode
@@ -459,48 +387,13 @@ func getEntryNodeInfo(tag string, defaultPort int) (string, int) {
 			}
 		}
 	}
-	return "VPS_IP_OR_DOMAIN", defaultPort
+	return "VPS_IP_OR_DOMAIN", 443
 }
 
 func generateProxyLink(u User) string {
-	domain, port := getEntryNodeInfo(u.Tag, u.Port)
-	proto := u.Protocol
-	if proto == "" {
-		proto = u.Type
-	}
-	secret := u.Secret
-	if secret == "" {
-		if u.UUID != "" {
-			secret = u.UUID
-		} else {
-			secret = u.Password
-		}
-	}
-
-	switch proto {
-	case "vless", "vless-reality":
-		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
-			secret, domain, port, domain, u.Username)
-
-	case "vless-grpc", "vless-grpc-reality":
-		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=grpc&security=reality&serviceName=grpc&sni=%s#%s",
-			secret, domain, port, domain, u.Username)
-
-	case "vless-ws", "vless-ws-tls":
-		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=ws&security=tls&path=/vless&sni=%s#%s",
-			secret, domain, port, domain, u.Username)
-
-	case "hysteria2", "hy2":
-		return fmt.Sprintf("hy2://%s@%s:%d?sni=%s&insecure=1#%s",
-			secret, domain, port, domain, u.Username)
-
-	case "tuic":
-		return fmt.Sprintf("tuic://%s:%s@%s:%d?sni=%s&congestion_control=bbr#%s",
-			secret, secret, domain, port, domain, u.Username)
-
-	default:
-		return ""
-	}
+	domain, port := getEntryNodeInfo(u.Tag)
+	return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
+		u.Secret, domain, port, domain, u.Username)
 }
 
 func reloadSingbox() {
@@ -516,16 +409,4 @@ func generateUUID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
-func generateRandomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "P@ssw0rdError"
-	}
-	for i, x := range b {
-		b[i] = letters[x%byte(len(letters))]
-	}
-	return string(b)
 }
