@@ -22,7 +22,7 @@ render_entry_node_menu() {
         echo -e " ${GREEN}1.${NC} Thêm Entry Node"
         echo -e " ${GREEN}2.${NC} Sửa Entry Node"
         echo -e " ${GREEN}3.${NC} Xóa Entry Node"
-        echo -e "${RED}0.${NC} Quay lại Menu Chính"
+        echo -e " ${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-3]: " choice
 

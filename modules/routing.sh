@@ -188,8 +188,8 @@ edit_routing_rule() {
     fi
 
     local old_in old_out
-    old_in=$(jq -r --argjson i "$idx" '.[$idx].inbound | join(", ")' "$ROUTING_FILE")
-    old_out=$(jq -r --argjson i "$idx" '.[$idx].outbound' "$ROUTING_FILE")
+    old_in=$(jq -r --argjson i "$idx" '.[$i].inbound | join(", ")' "$ROUTING_FILE")
+    old_out=$(jq -r --argjson i "$idx" '.[$i].outbound' "$ROUTING_FILE")
 
     echo -e "Đang sửa Quy tắc: Inbound [${CYAN}$old_in${NC}] -> Outbound [${CYAN}$old_out${NC}]"
     
@@ -291,8 +291,8 @@ delete_routing_rule() {
     fi
 
     local target_in target_out
-    target_in=$(jq -r --argjson i "$idx" '.[$idx].inbound | join(", ")' "$ROUTING_FILE")
-    target_out=$(jq -r --argjson i "$idx" '.[$idx].outbound' "$ROUTING_FILE")
+    target_in=$(jq -r --argjson i "$idx" '.[$i].inbound | join(", ")' "$ROUTING_FILE")
+    target_out=$(jq -r --argjson i "$idx" '.[$i].outbound' "$ROUTING_FILE")
 
     read -p "Bạn có chắc chắn muốn xóa quy tắc (Inbound: $target_in -> Outbound: $target_out) không? (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
