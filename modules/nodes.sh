@@ -163,6 +163,8 @@ ask_tag() {
         country=$(get_vps_country 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-_')
         if [ -z "$country" ] || [ "$country" = "unknown" ]; then
             country="vps"
+        else
+            country=$(echo "$country" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
         fi
         ASKED_TAG="${country}-${ASKED_PORT}"
         echo -e "${GREEN} -> Đã tạo Tag tự động theo quốc gia và port: $ASKED_TAG${NC}"
