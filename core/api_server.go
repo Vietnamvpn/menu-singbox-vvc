@@ -252,10 +252,17 @@ func systemSyncRoutine() {
 	}
 }
 
-// Thực thi các lệnh task nhận từ web (Đã bổ sung logic cập nhật users.json và build lại config)
+// Thực thi các lệnh task nhận từ web (Đã bổ sung ghi log ra file debug_task.json)
 func executeTask(task Task) {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
+
+	// --- Ghi lại task nhận được từ web ra tệp để kiểm tra ---
+	debugFile := filepath.Join(DataDir, "debug_task.json")
+	if debugData, err := json.MarshalIndent(task, "", "  "); err == nil {
+		_ = os.WriteFile(debugFile, debugData, 0644)
+	}
+	// -----------------------------------------------------
 
 	var payload map[string]interface{}
 	if task.Payload != "" {
