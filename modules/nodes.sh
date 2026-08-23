@@ -137,7 +137,7 @@ ASKED_SNI=""
 ask_sni() {
     read -p " Nhập SNI (Server Name) [Để trống = tự tạo ngẫu nhiên]: " ASKED_SNI
     if [ -z "$ASKED_SNI" ]; then
-        local snis=("itunes.apple.com" "www.microsoft.com" "www.bing.com" "update.microsoft.com" "gateway.icloud.com")
+        local snis=("itunes.apple.com" "aws.amazon.com" "www.bing.com" "s0.awsstatic.com" "gateway.icloud.com")
         local index=$((RANDOM % ${#snis[@]}))
         ASKED_SNI="${snis[$index]}"
         echo -e "${GREEN} -> Đã tự chọn SNI ngẫu nhiên: $ASKED_SNI${NC}"
