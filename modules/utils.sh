@@ -26,24 +26,40 @@ mkdir -p "$LOG_DIR"
 # CÁC HÀM GHI LOG
 # ==========================================
 
+# Hàm kiểm tra dung lượng và làm mới log nếu >= 1MB (1048576 bytes)
+append_log() {
+    local level="$1"
+    local msg="$2"
+    
+    if [ -f "$LOG_FILE" ]; then
+        local file_size
+        file_size=$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+        if [ "$file_size" -ge 1048576 ]; then
+            > "$LOG_FILE" # Làm trống file log
+        fi
+    fi
+    
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [$level] $msg" >> "$LOG_FILE"
+}
+
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] $1" >> "$LOG_FILE"
+    append_log "INFO" "$1"
 }
 
 log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [SUCCESS] $1" >> "$LOG_FILE"
+    append_log "SUCCESS" "$1"
 }
 
 log_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [WARN] $1" >> "$LOG_FILE"
+    append_log "WARN" "$1"
 }
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [ERROR] $1" >> "$LOG_FILE"
+    append_log "ERROR" "$1"
     exit 1
 }
 
