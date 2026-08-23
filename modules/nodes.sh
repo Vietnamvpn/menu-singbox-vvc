@@ -702,8 +702,31 @@ update_node() {
 
     echo -e "${GREEN} -> Đang tiến hành cập nhật cho node: $node_tag${NC}"
     
+    read -p " Nhập Tag mới [Để trống để giữ nguyên]: " new_tag
     read -p " Nhập Tên miền (Domain) mới [Để trống để giữ nguyên]: " new_domain
     read -p " Nhập Port mới [Để trống để giữ nguyên]: " new_port
+
+    if [ -n "$new_tag" ] && [ "$new_tag" != "$node_tag" ]; then
+        if grep -q "\"tag\": \"$new_tag\"" "$NODES_FILE" 2>/dev/null; then
+            echo -e "${RED}Lỗi: Tag '$new_tag' đã tồn tại! Bỏ qua cập nhật tag.${NC}"
+        else
+            jq --arg old_tag "$node_tag" --arg new_tag "$new_tag" \
+               '(.[] | select(.tag == $old_tag).tag) = $new_tag' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
+            
+            if [ -f "$DOMAIN_FILE" ] && jq -e --arg tag "$node_tag" '.[] | select(.tag == $tag)' "$DOMAIN_FILE" >/dev/null 2>&1; then
+                jq --arg old_tag "$node_tag" --arg new_tag "$new_tag" \
+                   '(.[] | select(.tag == $old_tag).tag) = $new_tag' "$DOMAIN_FILE" > "$DOMAIN_FILE.tmp" && mv "$DOMAIN_FILE.tmp" "$DOMAIN_FILE"
+            fi
+
+            if [ -f "$USERS_FILE" ]; then
+                jq --arg old_tag "$node_tag" --arg new_tag "$new_tag" \
+                   '(.[] | select(.tag == $old_tag).tag) = $new_tag' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+            fi
+
+            echo -e "${GREEN} -> Cập nhật Tag thành công từ '$node_tag' sang '$new_tag'.${NC}"
+            node_tag="$new_tag"
+        fi
+    fi
 
     if [ -n "$new_domain" ]; then
         jq --arg tag "$node_tag" --arg domain "$new_domain" \

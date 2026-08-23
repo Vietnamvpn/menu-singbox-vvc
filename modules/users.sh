@@ -397,7 +397,7 @@ while true; do
     echo -e " ${GREEN}2.${NC} Thêm User Mới"
     echo -e " ${GREEN}3.${NC} Xóa User"
     echo -e " ${GREEN}4.${NC} Reset Token User"
-    echo -e "${RED}0.${NC} Quay Lại Menu Chính"
+    echo -e " ${RED}0.${NC} Quay Lại Menu Chính"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn chức năng [0-4]: " choice
 
