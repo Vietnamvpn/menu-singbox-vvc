@@ -187,8 +187,10 @@ uninstall_system() {
         if [ -d "$INSTALL_DIR" ]; then
             rm -rf "$INSTALL_DIR"
             log_success "Đã gỡ bỏ hoàn toàn hệ thống và dọn dẹp dữ liệu thành công."
+            exit 0
         else
             log_warn "Thư mục cài đặt không tồn tại hoặc đã được xóa trước đó."
+            exit 0
         fi
     else
         log_info "Đã hủy thao tác gỡ bỏ hệ thống."
