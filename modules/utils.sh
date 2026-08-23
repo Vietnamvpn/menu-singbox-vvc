@@ -385,6 +385,7 @@ build_and_apply_config() {
     local dest_config="/etc/sing-box/config.json"
     local nodes_file="${INSTALL_DIR}/data/nodes.json"
     local users_file="${INSTALL_DIR}/data/users.json"
+    local outbound_file="${INSTALL_DIR}/data/outbound.json"
     
     # 1. Kiểm tra file mẫu và file dữ liệu
     if [ ! -f "$base_config" ]; then
@@ -399,16 +400,19 @@ build_and_apply_config() {
         echo "[]" > "$users_file"
     fi
 
+    if [ ! -f "$outbound_file" ]; then
+        echo "[]" > "$outbound_file"
+    fi
+
     # 2. Kiểm tra thư mục đích
     if [ ! -d "/etc/sing-box" ]; then
         mkdir -p "/etc/sing-box"
     fi
 
-    log_info "Đang tổng hợp nodes và users vào cấu hình..."
+    log_info "Đang tổng hợp nodes, users và outbounds vào cấu hình..."
     
-    # 3. Sử dụng jq với --slurpfile để kết hợp base_config, nodes.json và users.json 
-    # Đã bổ sung điều kiện lọc user có tag khớp với node hoặc tag == "all"
-    if jq --slurpfile nodes "$nodes_file" --slurpfile users "$users_file" '
+    # 3. Sử dụng jq để kết hợp base_config, nodes, users và outbounds
+    if jq --slurpfile nodes "$nodes_file" --slurpfile users "$users_file" --slurpfile outbounds "$outbound_file" '
         .inbounds = [
             ($nodes[0][]? | . as $n | 
                 ([$users[0][]? | select(.tag == $n.tag or .tag == "all")]) as $matched_users |
@@ -493,25 +497,26 @@ build_and_apply_config() {
                         }
                     }
                 elif $n.type == "tuic" then
-    {
-        type: "tuic",
-        tag: $n.tag,
-        listen: "::",
-        listen_port: $n.port,
-        users: (if ($matched_users | length) > 0 then [$matched_users[] | {uuid: .secret, password: $n.password}] else [{uuid: $n.uuid, password: $n.password}] end),
-        tls: {
-            enabled: true,
-            server_name: $n.domain,
-            alpn: ["h3"],
-            certificate_path: $n.cert_path,
-            key_path: $n.key_path
-        }
-    }
+                    {
+                        type: "tuic",
+                        tag: $n.tag,
+                        listen: "::",
+                        listen_port: $n.port,
+                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {uuid: .secret, password: $n.password}] else [{uuid: $n.uuid, password: $n.password}] end),
+                        tls: {
+                            enabled: true,
+                            server_name: $n.domain,
+                            alpn: ["h3"],
+                            certificate_path: $n.cert_path,
+                            key_path: $n.key_path
+                        }
+                    }
                 else
                     empty
                 end
             )
-        ]
+        ] |
+        .outbounds = (.outbounds + $outbounds[0])
     ' "$base_config" > "${dest_config}.tmp"; then
         
         mv "${dest_config}.tmp" "$dest_config"

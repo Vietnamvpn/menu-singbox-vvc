@@ -2,7 +2,6 @@
 
 OUTBOUND_FILE="/opt/menu-singbox-vvc/data/outbound.json"
 
-# Đảm bảo thư mục và tệp dữ liệu tồn tại
 mkdir -p "$(dirname "$OUTBOUND_FILE")"
 [ ! -f "$OUTBOUND_FILE" ] && echo "[]" > "$OUTBOUND_FILE"
 
@@ -21,7 +20,7 @@ render_outbound_menu() {
         echo " 4. Xóa Outbound"
         echo " 0. Quay lại Menu Chính"
         echo "================================================================"
-        read -p " Vوي lòng chọn một chức năng [0-4]: " choice
+        read -p " Vui lòng chọn một chức năng [0-4]: " choice
 
         case "$choice" in
             1)
@@ -66,13 +65,13 @@ list_outbounds_table() {
         tag=$(jq -r --argjson idx "$i" '.[$idx].tag // "N/A"' "$OUTBOUND_FILE")
         type=$(jq -r --argjson idx "$i" '.[$idx].type // "N/A"' "$OUTBOUND_FILE")
         server=$(jq -r --argjson idx "$i" '.[$idx].server // "N/A"' "$OUTBOUND_FILE")
-        port=$(jq -r --argjson idx "$i" '.[$idx].port // "N/A"' "$OUTBOUND_FILE")
+        port=$(jq -r --argjson idx "$i" '.[$idx].server_port // .[$idx].port // "N/A"' "$OUTBOUND_FILE")
         printf "%-4d | %-20s | %-12s | %-20s\n" "$((i+1))" "$tag" "$type" "$server:$port"
     done
     echo "----------------------------------------------------------------"
 }
 
-# Thêm outbound thủ công kèm kiểm tra lỗi
+# Thêm outbound thủ công
 add_outbound_manual() {
     echo "--------------------------------------------------"
     echo " THÊM OUTBOUND THỦ CÔNG"
@@ -114,19 +113,21 @@ add_outbound_manual() {
         return
     fi
 
+    # Lưu theo đúng chuẩn sing-box (server_port)
     jq --arg t "$tag" --arg tp "$type" --arg s "$server" --argjson p "$port" \
-       '. += [{"tag": $t, "type": $tp, "server": $s, "port": $p}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
+       '. += [{"type": $tp, "tag": $t, "server": $s, "server_port": $p}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
 
     echo -e "\033[32m[THÀNH CÔNG] Đã thêm outbound '$tag' thành công!\033[0m"
     
-    if declare -f reload_singbox > /dev/null; then
-        reload_singbox
+    # Gọi hàm build cấu hình hệ thống
+    if declare -f build_and_apply_config > /dev/null; then
+        build_and_apply_config
     fi
     
     read -p "Nhấn Enter để tiếp tục..."
 }
 
-# Thêm outbound tự động từ link chia sẻ (vless, vmess, trojan, hysteria2, tuic, socks, ss)
+# Thêm outbound từ link chia sẻ
 add_outbound_from_link() {
     echo "--------------------------------------------------"
     echo " THÊM OUTBOUND TỪ LINK CHIA SẺ"
@@ -142,7 +143,6 @@ add_outbound_from_link() {
     local remainder="${link#*://}"
     local tag=""
 
-    # Lấy tên tag từ phần fragment (#tag) cuối link nếu có
     if [[ "$remainder" == *#* ]]; then
         tag="${remainder#*#}"
         tag=$(python3 -c "import urllib.parse; print(urllib.parse.unquote('$tag'))" 2>/dev/null || echo "$tag")
@@ -151,7 +151,6 @@ add_outbound_from_link() {
         tag="node_$(date +%s)"
     fi
 
-    # Kiểm tra trùng tag
     local exists
     exists=$(jq --arg t "$tag" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
     if [ "$exists" -gt 0 ]; then
@@ -162,35 +161,17 @@ add_outbound_from_link() {
     local port=""
     local type="$proto"
 
-    # Chuẩn hóa tên giao thức theo chuẩn sing-box
     case "$proto" in
-        hy2|hysteria2)
-            type="hysteria2"
-            ;;
-        socks5|socks)
-            type="socks"
-            ;;
-        ss|shadowsocks)
-            type="shadowsocks"
-            ;;
-        vless)
-            type="vless"
-            ;;
-        vmess)
-            type="vmess"
-            ;;
-        trojan)
-            type="trojan"
-            ;;
-        tuic)
-            type="tuic"
-            ;;
-        *)
-            type="$proto"
-            ;;
+        hy2|hysteria2) type="hysteria2" ;;
+        socks5|socks) type="socks" ;;
+        ss|shadowsocks) type="shadowsocks" ;;
+        vless) type="vless" ;;
+        vmess) type="vmess" ;;
+        trojan) type="trojan" ;;
+        tuic) type="tuic" ;;
+        *) type="$proto" ;;
     esac
 
-    # Bóc tách server và port từ link
     local authority="${remainder%%\?*}"
     if [[ "$authority" == *@* ]]; then
         authority="${authority#*@}"
@@ -209,19 +190,18 @@ add_outbound_from_link() {
     fi
 
     if [ -z "$server" ]; then
-        echo -e "\033[31m[LỖI] Không thể phân tích được địa chỉ Server từ link này. Vui lòng kiểm tra lại định dạng!\033[0m"
+        echo -e "\033[31m[LỖI] Không thể phân tích được địa chỉ Server từ link này.\033[0m"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
-    # Lưu vào tệp outbound.json
     jq --arg t "$tag" --arg tp "$type" --arg s "$server" --argjson p "$port" --arg l "$link" \
-       '. += [{"tag": $t, "type": $tp, "server": $s, "port": $p, "raw_link": $l}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
+       '. += [{"type": $tp, "tag": $t, "server": $s, "server_port": $p, "raw_link": $l}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
 
-    echo -e "\033[32m[THÀNH CÔNG] Đã thêm outbound '$tag' (Loại: $type, Server: $server:$port) thành công từ link!\033[0m"
+    echo -e "\033[32m[THÀNH CÔNG] Đã thêm outbound '$tag' (Loại: $type, Server: $server:$port) thành công!\033[0m"
     
-    if declare -f reload_singbox > /dev/null; then
-        reload_singbox
+    if declare -f build_and_apply_config > /dev/null; then
+        build_and_apply_config
     fi
     
     read -p "Nhấn Enter để tiếp tục..."
@@ -262,7 +242,7 @@ edit_outbound() {
     old_tag=$(jq -r --argjson i "$idx" '.[$i].tag' "$OUTBOUND_FILE")
     old_type=$(jq -r --argjson i "$idx" '.[$i].type' "$OUTBOUND_FILE")
     old_server=$(jq -r --argjson i "$idx" '.[$i].server // ""' "$OUTBOUND_FILE")
-    old_port=$(jq -r --argjson i "$idx" '.[$i].port // 0' "$OUTBOUND_FILE")
+    old_port=$(jq -r --argjson i "$idx" '.[$i].server_port // .[$i].port // 0' "$OUTBOUND_FILE")
 
     echo "Đang sửa Outbound: $old_tag"
     read -p "Nhập Tag mới [Mặc định: $old_tag]: " new_tag
@@ -294,12 +274,12 @@ edit_outbound() {
     fi
 
     jq --argjson i "$idx" --arg t "$new_tag" --arg tp "$new_type" --arg s "$new_server" --argjson p "$new_port" \
-       '.[$i] = {"tag": $t, "type": $tp, "server": $s, "port": $p}' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
+       '.[$i] = {"type": $tp, "tag": $t, "server": $s, "server_port": $p}' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
 
     echo -e "\033[32m[THÀNH CÔNG] Đã cập nhật outbound thành công!\033[0m"
     
-    if declare -f reload_singbox > /dev/null; then
-        reload_singbox
+    if declare -f build_and_apply_config > /dev/null; then
+        build_and_apply_config
     fi
 
     read -p "Nhấn Enter để tiếp tục..."
@@ -344,8 +324,8 @@ delete_outbound() {
         jq --argjson i "$idx" 'del(.[$i])' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
         echo -e "\033[32m[THÀNH CÔNG] Đã xóa outbound '$target_tag' khỏi hệ thống!\033[0m"
         
-        if declare -f reload_singbox > /dev/null; then
-            reload_singbox
+        if declare -f build_and_apply_config > /dev/null; then
+            build_and_apply_config
         fi
     else
         echo "Đã hủy thao tác xóa."
