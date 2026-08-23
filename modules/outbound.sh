@@ -19,10 +19,10 @@ render_outbound_menu() {
         echo -e "${BLUE}================================================================${NC}"
         list_outbounds_table
         echo -e "${BLUE}================================================================${NC}"
-        echo -e " ${GREEN}1.${NC} Thêm Outbound từ Link Chia Sẻ (Share Link)"
-        echo -e " ${GREEN}2.${NC} Sửa Outbound"
-        echo -e " ${GREEN}3.${NC} Xóa Outbound"
-        echo -e "${RED}0.${NC} Quay lại Menu Chính"
+        echo -e " ${GREEN}1.${NC} Thêm Link Outbound"
+        echo -e " ${GREEN}2.${NC} Sửa Link Outbound"
+        echo -e " ${GREEN}3.${NC} Xóa Link Outbound"
+        echo -e " ${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-3]: " choice
 
