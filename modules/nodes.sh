@@ -663,7 +663,13 @@ list_nodes() {
         return 1
     else
         if command -v jq &> /dev/null; then
-            jq -r 'to_entries[] | "\(.key + 1). Tag: \(.value.tag) │ Type: \(.value.type) │ Port: \(.value.port)\n    Domain: \(.value.domain // "N/A") │ SNI: \(.value.sni // "N/A")"' "$NODES_FILE"
+            local i=1
+            while read -r tag type port domain sni; do
+                echo -e " ${GREEN}$i.${NC} Tag: ${CYAN}$tag${NC} │ Type: ${PURPLE}$type${NC} │ Port: ${YELLOW}$port${NC}"
+                echo -e "    Domain: ${BLUE}$domain${NC} │ SNI: ${BLUE}$sni${NC}"
+                echo -e "${CYAN}----------------------------------------------------------------${NC}"
+                i=$((i + 1))
+            done < <(jq -r '.[] | "\(.tag) \(.type) \(.port) \(.domain // "N/A") \(.sni // "N/A")"' "$NODES_FILE")
         else
             cat "$NODES_FILE"
         fi
