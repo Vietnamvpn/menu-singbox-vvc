@@ -56,9 +56,9 @@ type ResetResponse struct {
 
 // Cấu trúc Task nhận từ Web trung tâm qua action get_tasks
 type Task struct {
-	ID      int    `json:"id"`
-	Action  string `json:"action"`
-	Payload string `json:"payload"`
+	ID      interface{}     `json:"id"` // Đổi thành interface{} để nhận cả số (12) và chuỗi ("12")
+	Action  string          `json:"action"`
+	Payload json.RawMessage `json:"payload"` // Đổi thành json.RawMessage để nhận cả Object lẫn Chuỗi JSON
 }
 
 type TasksResponse struct {
@@ -246,8 +246,15 @@ func executeTask(task Task) {
 	}
 
 	var payload map[string]interface{}
-	if task.Payload != "" {
-		_ = json.Unmarshal([]byte(task.Payload), &payload)
+	if len(task.Payload) > 0 {
+		// Thử giải mã nếu payload là Object JSON
+		if err := json.Unmarshal(task.Payload, &payload); err != nil {
+			// Nếu lỗi, thử giải mã nếu payload là String chứa JSON
+			var payloadStr string
+			if errStr := json.Unmarshal(task.Payload, &payloadStr); errStr == nil {
+				_ = json.Unmarshal([]byte(payloadStr), &payload)
+			}
+		}
 	}
 
 	actionType := payload["action"]
