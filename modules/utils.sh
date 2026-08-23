@@ -67,11 +67,13 @@ get_singbox_status() {
     fi
 }
 
-# Lấy phiên bản Sing-box core
+# Lấy phiên bản Sing-box core tối ưu
 get_singbox_version() {
-    if command -v sing-box >/dev/null 2>&1; then
+    local bin_path="/usr/local/bin/sing-box"
+    if [ -f "$bin_path" ] && [ -x "$bin_path" ]; then
         local ver
-        ver=$(sing-box version 2>/dev/null | grep -i "version" | awk '{print $3}')
+        # Tự động quét và bắt chuẩn chuỗi phiên bản (ví dụ: 1.13.14 hoặc v1.13.14)
+        ver=$($bin_path version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?' | head -n 1)
         if [ -n "$ver" ]; then
             echo -e "${CYAN}$ver${NC}"
         else
