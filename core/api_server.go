@@ -281,8 +281,34 @@ func executeTask(task Task) {
 				newUser.Username = un
 			}
 		}
-		if newUser.Secret == "" && newUser.UUID == "" && newUser.Password == "" {
-			newUser.Secret = generateUUID()
+
+		// Tự động đồng bộ UUID/Password/Secret để áp dụng cho mọi giao thức khi web chỉ truyền uuid
+		if newUser.UUID != "" {
+			if newUser.Password == "" {
+				newUser.Password = newUser.UUID
+			}
+			if newUser.Secret == "" {
+				newUser.Secret = newUser.UUID
+			}
+		} else if newUser.Password != "" {
+			if newUser.UUID == "" {
+				newUser.UUID = newUser.Password
+			}
+			if newUser.Secret == "" {
+				newUser.Secret = newUser.Password
+			}
+		} else if newUser.Secret != "" {
+			if newUser.UUID == "" {
+				newUser.UUID = newUser.Secret
+			}
+			if newUser.Password == "" {
+				newUser.Password = newUser.Secret
+			}
+		} else {
+			uID := generateUUID()
+			newUser.UUID = uID
+			newUser.Password = uID
+			newUser.Secret = uID
 		}
 
 		if newUser.Username != "" {
