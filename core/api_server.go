@@ -27,29 +27,34 @@ var (
 	fileMutex     sync.Mutex
 )
 
+// Cấu hình API Web trung tâm đọc từ tệp hệ thống
 type ApiConfig struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
 	Port  int    `json:"port"`
 }
 
-// Cấu trúc User chuẩn khớp với users.json trên VPS
+// Cấu trúc User chuẩn: Lấy UUID từ Web gán vào Secret, giữ lại trường Status cho lệnh toggle_user
 type User struct {
 	Username string `json:"username"`
 	Tag      string `json:"tag"`
 	Secret   string `json:"secret"`
+	Status   string `json:"status,omitempty"`
 }
 
+// Request từ Web trung tâm gửi sang để reset
 type ResetRequest struct {
 	Username string `json:"username"`
 }
 
+// Response trả về Web trung tâm
 type ResetResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 	NewLink string `json:"new_link,omitempty"`
 }
 
+// Cấu trúc Task nhận từ Web trung tâm qua action get_tasks
 type Task struct {
 	ID      int    `json:"id"`
 	Action  string `json:"action"`
@@ -61,6 +66,7 @@ type TasksResponse struct {
 	Tasks  []Task `json:"tasks"`
 }
 
+// Cấu trúc Entry Node để thay thế IP/Port trước khi trả link
 type EntryNode struct {
 	Tag    string `json:"tag"`
 	Domain string `json:"domain"`
@@ -70,10 +76,10 @@ type EntryNode struct {
 func main() {
 	os.MkdirAll(DataDir, 0755)
 
-	// Tiến trình đồng bộ định kỳ (1 phút/lần)
+	// Chạy tiến trình đồng bộ tổng hợp với node_sync.php (Đẩy inbounds, traffic, nhận task mỗi 1 phút)
 	go systemSyncRoutine()
 
-	// HTTP API Endpoint chờ lệnh reset password
+	// Mở HTTP API Server chờ lệnh tức thời từ Web trung tâm (ví dụ: Reset Token)
 	http.HandleFunc("/api/reset-password", handleResetPassword)
 
 	log.Printf("Sing-box Manager API Server đang chạy tại port %s", ListenAddr)
@@ -82,6 +88,7 @@ func main() {
 	}
 }
 
+// Đọc cấu hình API động từ tệp cấu hình của hệ thống
 func getApiConfig() (string, string, int) {
 	data, err := os.ReadFile(apiConfigFile)
 	if err != nil {
@@ -94,6 +101,7 @@ func getApiConfig() (string, string, int) {
 	return config.URL, config.Token, config.Port
 }
 
+// Helper gửi request POST chung đến node_sync.php theo chuẩn Header X-API-Port và X-API-Token
 func sendApiRequest(action string, payload map[string]interface{}, result interface{}) error {
 	baseURL, token, port := getApiConfig()
 	if baseURL == "" || token == "" {
@@ -132,6 +140,7 @@ func sendApiRequest(action string, payload map[string]interface{}, result interf
 	return nil
 }
 
+// Xử lý yêu cầu reset từ web trung tâm
 func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -185,6 +194,7 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	sendJSONResponse(w, "success", "Reset thành công", newLink)
 }
 
+// TIẾN TRÌNH ĐỒNG BỘ TỔNG HỢP VỚI node_sync.php (CHẠY MỖI 1 PHÚT)
 func systemSyncRoutine() {
 	ticker := time.NewTicker(1 * time.Minute)
 	for range ticker.C {
@@ -225,6 +235,7 @@ func systemSyncRoutine() {
 	}
 }
 
+// Thực thi các lệnh task nhận từ web
 func executeTask(task Task) {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
@@ -248,31 +259,21 @@ func executeTask(task Task) {
 	var errorMsg *string
 
 	switch actionType {
-	case "add_user", "create_user":
+	case "add_user", "create_user", "reset_token":
+		// Theo code PHP, web gửi ['uuid' => $uuid, 'username' => $username]
 		username, _ := payload["username"].(string)
+		uuid, _ := payload["uuid"].(string)
 
-		// Lấy giá trị secret/uuid từ payload web gửi xuống
-		var secret string
-		if s, ok := payload["secret"].(string); ok && s != "" {
-			secret = s
-		} else if u, ok := payload["uuid"].(string); ok && u != "" {
-			secret = u
-		} else if p, ok := payload["password"].(string); ok && p != "" {
-			secret = p
-		} else {
-			secret = generateUUID()
-		}
-
-		if username != "" {
+		if username != "" && uuid != "" {
 			users, err := readUsers()
 			if err != nil {
 				users = []User{}
 			}
-
 			exists := false
 			for i, u := range users {
 				if u.Username == username {
-					users[i].Secret = secret
+					users[i].Secret = uuid
+					users[i].Status = "" // Xóa trạng thái disabled nếu user được add/reset lại
 					if users[i].Tag == "" {
 						users[i].Tag = "all"
 					}
@@ -280,29 +281,23 @@ func executeTask(task Task) {
 					break
 				}
 			}
-
 			if !exists {
-				tag := "all"
-				if t, ok := payload["tag"].(string); ok && t != "" {
-					tag = t
-				}
 				users = append(users, User{
 					Username: username,
-					Tag:      tag,
-					Secret:   secret,
+					Tag:      "all",
+					Secret:   uuid,
 				})
 			}
-
 			if err := writeUsers(users); err == nil {
 				log.Printf("[TASK] Đã thêm/cập nhật user từ web: %s", username)
-				go reloadSingbox() // Gọi build_and_apply_config trong utils.sh
+				go reloadSingbox()
 			} else {
 				errMsg := err.Error()
 				errorMsg = &errMsg
 				taskStatus = "error"
 			}
 		} else {
-			errMsg := "Username trống trong payload"
+			errMsg := "Username hoặc UUID trống trong payload"
 			errorMsg = &errMsg
 			taskStatus = "error"
 		}
@@ -334,10 +329,48 @@ func executeTask(task Task) {
 			}
 		}
 
+	case "toggle_user":
+		// Theo code PHP, web gửi ['username' => $username, 'uuid' => $uuid, 'status' => $status]
+		username, _ := payload["username"].(string)
+		status, _ := payload["status"].(string)
+
+		log.Printf("[TASK] Nhận lệnh toggle_user cho %s với trạng thái %s", username, status)
+		users, err := readUsers()
+		if err == nil {
+			updated := false
+			for i := range users {
+				if users[i].Username == username {
+					users[i].Status = status // Cập nhật trạng thái (ví dụ: 'disabled')
+					updated = true
+					break
+				}
+			}
+			if updated {
+				if err := writeUsers(users); err == nil {
+					go reloadSingbox()
+				} else {
+					errMsg := err.Error()
+					errorMsg = &errMsg
+					taskStatus = "error"
+				}
+			}
+		}
+
+	case "toggle_service":
+		state, _ := payload["state"].(string)
+		if state == "stop" {
+			exec.Command("systemctl", "stop", "sing-box").Run()
+			log.Println("[TASK] Đã tắt dịch vụ sing-box theo lệnh từ web.")
+		} else if state == "start" {
+			exec.Command("systemctl", "start", "sing-box").Run()
+			log.Println("[TASK] Đã bật dịch vụ sing-box theo lệnh từ web.")
+		}
+
 	default:
 		log.Printf("[TASK] Hành động không hỗ trợ: %v", actionType)
 	}
 
+	// Báo cáo kết quả task về node_sync.php
 	_ = sendApiRequest("update_task_status", map[string]interface{}{
 		"task_id":     task.ID,
 		"task_status": taskStatus,
@@ -409,4 +442,16 @@ func generateUUID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+func generateRandomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "P@ssw0rdError"
+	}
+	for i, x := range b {
+		b[i] = letters[x%byte(len(letters))]
+	}
+	return string(b)
 }
