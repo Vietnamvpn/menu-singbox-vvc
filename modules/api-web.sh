@@ -151,3 +151,4 @@ test_api_connection() {
     fi
     read -p "Nhấn Enter để tiếp tục..."
 }
+render_api_menu

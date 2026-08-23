@@ -333,3 +333,4 @@ delete_outbound() {
 
     read -p "Nhấn Enter để tiếp tục..."
 }
+render_outbound_menu
