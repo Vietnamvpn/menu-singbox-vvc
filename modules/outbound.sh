@@ -19,32 +19,28 @@ render_outbound_menu() {
         echo -e "${BLUE}================================================================${NC}"
         list_outbounds_table
         echo -e "${BLUE}================================================================${NC}"
-        echo -e " ${GREEN}1.${NC} Thêm Outbound Thủ Công"
-        echo -e " ${GREEN}2.${NC} Thêm Outbound từ Link Chia Sẻ (Share Link)"
-        echo -e " ${GREEN}3.${NC} Sửa Outbound"
-        echo -e " ${GREEN}4.${NC} Xóa Outbound"
+        echo -e " ${GREEN}1.${NC} Thêm Link Outbound"
+        echo -e " ${GREEN}2.${NC} Sửa Link Outbound"
+        echo -e " ${GREEN}3.${NC} Xóa Link Outbound"
         echo -e "${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
-        read -p " Vui lòng chọn một chức năng [0-4]: " choice
+        read -p " Vui lòng chọn một chức năng [0-3]: " choice
 
         case "$choice" in
             1)
-                add_outbound_manual
-                ;;
-            2)
                 add_outbound_from_link
                 ;;
-            3)
+            2)
                 edit_outbound
                 ;;
-            4)
+            3)
                 delete_outbound
                 ;;
             0)
                 break
                 ;;
             *)
-                echo -e "${RED}[LỖI] Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 4.${NC}"
+                echo -e "${RED}[LỖI] Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 3.${NC}"
                 sleep 1
                 ;;
         esac
@@ -76,66 +72,12 @@ list_outbounds_table() {
     echo -e "${CYAN}----------------------------------------------------------------${NC}"
 }
 
-# Thêm outbound thủ công
-add_outbound_manual() {
-    echo -e "${CYAN}--------------------------------------------------${NC}"
-    echo -e "${YELLOW} THÊM OUTBOUND THỦ CÔNG${NC}"
-    echo -e "${CYAN}--------------------------------------------------${NC}"
-    
-    read -p "Nhập Tag (Tên định danh duy nhất): " tag
-    if [ -z "$tag" ]; then
-        echo -e "${RED}[LỖI] Tag không được để trống!${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    local exists
-    exists=$(jq --arg t "$tag" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
-    if [ "$exists" -gt 0 ]; then
-        echo -e "${RED}[LỖI] Tag '$tag' đã tồn tại! Vui lòng chọn tên khác.${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    read -p "Nhập Loại Outbound (vd: vless, vmess, trojan, hysteria2, tuic, socks, shadowsocks): " type
-    if [ -z "$type" ]; then
-        echo -e "${RED}[LỖI] Loại outbound không được để trống!${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    read -p "Nhập Địa chỉ Server: " server
-    if [ -z "$server" ]; then
-        echo -e "${RED}[LỖI] Địa chỉ Server không được để trống!${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    read -p "Nhập Cổng (Port): " port
-    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}[LỖI] Cổng (Port) phải là một số nguyên hợp lệ!${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    jq --arg t "$tag" --arg tp "$type" --arg s "$server" --argjson p "$port" \
-       '. += [{"type": $tp, "tag": $t, "server": $s, "server_port": $p}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
-
-    log_success "Đã thêm outbound '$tag' thành công!"
-    
-    if declare -f build_and_apply_config > /dev/null; then
-        build_and_apply_config
-    fi
-    
-    read -p "Nhấn Enter để tiếp tục..."
-}
-
-# Thêm outbound từ link chia sẻ (Đã tối ưu phân tích các trường kết nối chuẩn sing-box)
+# Thêm outbound từ link chia sẻ (Hỗ trợ giới hạn 3 giao thức: tuic, hy2/hysteria2, vless)
 add_outbound_from_link() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
     echo -e "${YELLOW} THÊM OUTBOUND TỪ LINK CHIA SẺ${NC}"
     echo -e "${CYAN}--------------------------------------------------${NC}"
-    read -p "Dán link chia sẻ (vless://, vmess://, trojan://, hy2://, tuic://, socks://, ss://...): " link
+    read -p "Dán link chia sẻ (vless://, hy2://, tuic://): " link
     if [ -z "$link" ]; then
         echo -e "${RED}[LỖI] Link không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
@@ -157,16 +99,13 @@ try:
     proto_map = {
         "hy2": "hysteria2",
         "hysteria2": "hysteria2",
-        "socks5": "socks",
-        "socks": "socks",
-        "ss": "shadowsocks",
-        "shadowsocks": "shadowsocks",
         "vless": "vless",
-        "vmess": "vmess",
-        "trojan": "trojan",
         "tuic": "tuic"
     }
-    out_type = proto_map.get(scheme, scheme)
+    out_type = proto_map.get(scheme)
+    if not out_type:
+        print(json.dumps({"error": "Hệ thống tạm thời chỉ hỗ trợ 3 giao thức: tuic, hy2, vless"}))
+        sys.exit(0)
     
     tag = ""
     if parsed.fragment:
@@ -241,17 +180,24 @@ try:
         if flow:
             outbound["flow"] = flow
             
-    elif out_type == "trojan":
+    elif out_type == "tuic":
         if parsed.username:
-            outbound["password"] = urllib.parse.unquote(parsed.username)
+            outbound["uuid"] = urllib.parse.unquote(parsed.username)
+        if parsed.password:
+            outbound["password"] = urllib.parse.unquote(parsed.password)
+            
         sni = get_q("sni") or hostname
-        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1"
+        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1" or get_q("allowinsecure") == "true"
+        congestion_control = get_q("congestion_control") or get_q("cc") or "bbr"
+        
         outbound["tls"] = {
             "enabled": True,
             "server_name": sni,
-            "insecure": insecure
+            "insecure": insecure,
+            "alpn": ["h3"]
         }
-        
+        outbound["congestion_control"] = congestion_control
+            
     print(json.dumps(outbound))
 except Exception as e:
     print(json.dumps({"error": str(e)}))

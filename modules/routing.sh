@@ -91,42 +91,58 @@ add_routing_rule() {
     fi
 
     echo -e "${CYAN}Danh sách Inbound Nodes có sẵn:${NC}"
-    jq -r '.[] | "- " + .tag' "$NODES_FILE"
+    local node_count
+    node_count=$(jq length "$NODES_FILE")
+    for ((i=0; i<node_count; i++)); do
+        local tag
+        tag=$(jq -r --argjson idx "$i" '.[$idx].tag' "$NODES_FILE")
+        echo -e " ${GREEN}$((i+1)).${NC} $tag"
+    done
     echo -e "${CYAN}--------------------------------------------------${NC}"
-    read -p "Nhập Tag của Inbound cần chuyển tiếp: " in_tag
+    read -p "Chọn số thứ tự của Inbound cần chuyển tiếp: " in_idx_input
 
-    if [ -z "$in_tag" ]; then
-        echo -e "${RED}[LỖI] Inbound tag không được để trống!${NC}"
+    if ! [[ "$in_idx_input" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}[LỖI] Lựa chọn phải là một số nguyên hợp lệ!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
-    local node_exists
-    node_exists=$(jq --arg t "$in_tag" '[.[] | select(.tag == $t)] | length' "$NODES_FILE")
-    if [ "$node_exists" -eq 0 ]; then
-        echo -e "${RED}[LỖI] Không tìm thấy Inbound với tag '$in_tag'!${NC}"
+    local in_idx=$((in_idx_input - 1))
+    if [ "$in_idx" -lt 0 ] || [ "$in_idx" -ge "$node_count" ]; then
+        echo -e "${RED}[LỖI] Số thứ tự Inbound không tồn tại!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
+
+    local in_tag
+    in_tag=$(jq -r --argjson idx "$in_idx" '.[$idx].tag' "$NODES_FILE")
 
     echo -e "${CYAN}Danh sách Outbounds có sẵn:${NC}"
-    jq -r '.[] | "- " + .tag' "$OUTBOUND_FILE"
+    local out_count
+    out_count=$(jq length "$OUTBOUND_FILE")
+    for ((i=0; i<out_count; i++)); do
+        local tag
+        tag=$(jq -r --argjson idx "$i" '.[$idx].tag' "$OUTBOUND_FILE")
+        echo -e " ${GREEN}$((i+1)).${NC} $tag"
+    done
     echo -e "${CYAN}--------------------------------------------------${NC}"
-    read -p "Nhập Tag của Outbound đích: " out_tag
+    read -p "Chọn số thứ tự của Outbound đích: " out_idx_input
 
-    if [ -z "$out_tag" ]; then
-        echo -e "${RED}[LỖI] Outbound tag không được để trống!${NC}"
+    if ! [[ "$out_idx_input" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}[LỖI] Lựa chọn phải là một số nguyên hợp lệ!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
-    local outbound_exists
-    outbound_exists=$(jq --arg t "$out_tag" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
-    if [ "$outbound_exists" -eq 0 ]; then
-        echo -e "${RED}[LỖI] Không tìm thấy Outbound với tag '$out_tag'!${NC}"
+    local out_idx=$((out_idx_input - 1))
+    if [ "$out_idx" -lt 0 ] || [ "$out_idx" -ge "$out_count" ]; then
+        echo -e "${RED}[LỖI] Số thứ tự Outbound không tồn tại!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
+
+    local out_tag
+    out_tag=$(jq -r --argjson idx "$out_idx" '.[$idx].tag' "$OUTBOUND_FILE")
 
     jq --arg it "$in_tag" --arg ot "$out_tag" \
        '. += [{"inbound": [$it], "outbound": $ot}]' "$ROUTING_FILE" > "$ROUTING_FILE.tmp" && mv "$ROUTING_FILE.tmp" "$ROUTING_FILE"
@@ -172,41 +188,63 @@ edit_routing_rule() {
     fi
 
     local old_in old_out
-    old_in=$(jq -r --argjson i "$idx" '.[$i].inbound | join(", ")' "$ROUTING_FILE")
-    old_out=$(jq -r --argjson i "$idx" '.[$i].outbound' "$ROUTING_FILE")
+    old_in=$(jq -r --argjson i "$idx" '.[$idx].inbound | join(", ")' "$ROUTING_FILE")
+    old_out=$(jq -r --argjson i "$idx" '.[$idx].outbound' "$ROUTING_FILE")
 
     echo -e "Đang sửa Quy tắc: Inbound [${CYAN}$old_in${NC}] -> Outbound [${CYAN}$old_out${NC}]"
     
     echo -e "${CYAN}Danh sách Inbound Nodes có sẵn:${NC}"
-    jq -r '.[] | "- " + .tag' "$NODES_FILE" 2>/dev/null
+    local node_count
+    node_count=$(jq length "$NODES_FILE")
+    for ((i=0; i<node_count; i++)); do
+        local tag
+        tag=$(jq -r --argjson idx "$i" '.[$idx].tag' "$NODES_FILE")
+        echo -e " ${GREEN}$((i+1)).${NC} $tag"
+    done
     echo -e "${CYAN}--------------------------------------------------${NC}"
-    read -p "Nhập Inbound Tag mới [Mặc định: $old_in]: " new_in
-    new_in="${new_in:-$old_in}"
+    read -p "Chọn số thứ tự Inbound mới [Nhấn Enter để giữ nguyên '$old_in']: " in_idx_input
 
-    if [ "$new_in" != "$old_in" ]; then
-        local node_exists
-        node_exists=$(jq --arg t "$new_in" '[.[] | select(.tag == $t)] | length' "$NODES_FILE")
-        if [ "$node_exists" -eq 0 ]; then
-            echo -e "${RED}[LỖI] Không tìm thấy Inbound với tag '$new_in'!${NC}"
+    local new_in="$old_in"
+    if [ -n "$in_idx_input" ]; then
+        if ! [[ "$in_idx_input" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}[LỖI] Lựa chọn phải là một số nguyên hợp lệ!${NC}"
             read -p "Nhấn Enter để tiếp tục..."
             return
         fi
+        local in_idx=$((in_idx_input - 1))
+        if [ "$in_idx" -lt 0 ] || [ "$in_idx" -ge "$node_count" ]; then
+            echo -e "${RED}[LỖI] Số thứ tự Inbound không tồn tại!${NC}"
+            read -p "Nhấn Enter để tiếp tục..."
+            return
+        fi
+        new_in=$(jq -r --argjson idx "$in_idx" '.[$idx].tag' "$NODES_FILE")
     fi
 
     echo -e "${CYAN}Danh sách Outbounds có sẵn:${NC}"
-    jq -r '.[] | "- " + .tag' "$OUTBOUND_FILE" 2>/dev/null
+    local out_count
+    out_count=$(jq length "$OUTBOUND_FILE")
+    for ((i=0; i<out_count; i++)); do
+        local tag
+        tag=$(jq -r --argjson idx "$i" '.[$idx].tag' "$OUTBOUND_FILE")
+        echo -e " ${GREEN}$((i+1)).${NC} $tag"
+    done
     echo -e "${CYAN}--------------------------------------------------${NC}"
-    read -p "Nhập Outbound Tag mới [Mặc định: $old_out]: " new_out
-    new_out="${new_out:-$old_out}"
+    read -p "Chọn số thứ tự Outbound mới [Nhấn Enter để giữ nguyên '$old_out']: " out_idx_input
 
-    if [ "$new_out" != "$old_out" ]; then
-        local outbound_exists
-        outbound_exists=$(jq --arg t "$new_out" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
-        if [ "$outbound_exists" -eq 0 ]; then
-            echo -e "${RED}[LỖI] Không tìm thấy Outbound với tag '$new_out'!${NC}"
+    local new_out="$old_out"
+    if [ -n "$out_idx_input" ]; then
+        if ! [[ "$out_idx_input" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}[LỖI] Lựa chọn phải là một số nguyên hợp lệ!${NC}"
             read -p "Nhấn Enter để tiếp tục..."
             return
         fi
+        local out_idx=$((out_idx_input - 1))
+        if [ "$out_idx" -lt 0 ] || [ "$out_idx" -ge "$out_count" ]; then
+            echo -e "${RED}[LỖI] Số thứ tự Outbound không tồn tại!${NC}"
+            read -p "Nhấn Enter để tiếp tục..."
+            return
+        fi
+        new_out=$(jq -r --argjson idx "$out_idx" '.[$idx].tag' "$OUTBOUND_FILE")
     fi
 
     jq --argjson i "$idx" --arg it "$new_in" --arg ot "$new_out" \
