@@ -79,6 +79,28 @@ open_firewall_port() {
     echo -e "${GREEN} -> Đã mở port $port thành công.${NC}"
 }
 
+close_firewall_port() {
+    local port=$1
+    echo -e "${YELLOW} Đang đóng port $port trên tường lửa...${NC}"
+    if command -v ufw >/dev/null 2>&1; then
+        ufw delete allow "$port"/tcp >/dev/null 2>&1
+        ufw delete allow "$port"/udp >/dev/null 2>&1
+    fi
+    if command -v iptables >/dev/null 2>&1; then
+        iptables -D INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null
+        iptables -D INPUT -p udp --dport "$port" -j ACCEPT 2>/dev/null
+        if command -v netfilter-persistent >/dev/null 2>&1; then
+            netfilter-persistent save >/dev/null 2>&1
+        fi
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        firewall-cmd --remove-port="${port}/tcp" --permanent >/dev/null 2>&1
+        firewall-cmd --remove-port="${port}/udp" --permanent >/dev/null 2>&1
+        firewall-cmd --reload >/dev/null 2>&1
+    fi
+    echo -e "${GREEN} -> Đã đóng port $port thành công.${NC}"
+}
+
 save_domain_mapping() {
     local tag=$1
     local domain=$2
@@ -135,21 +157,88 @@ ask_domain() {
 ASKED_TAG=""
 ask_tag() {
     local default_prefix=$1
-    read -p " Nhập Tag cho Node [Để trống = tự động theo port]: " ASKED_TAG
+    read -p " Nhập Tag cho Node [Để trống = tự động theo quốc gia & port]: " ASKED_TAG
     if [ -z "$ASKED_TAG" ]; then
-        ASKED_TAG="${default_prefix}-${ASKED_PORT}"
-        echo -e "${GREEN} -> Đã tạo Tag tự động: $ASKED_TAG${NC}"
+        local country
+        country=$(get_vps_country 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-_')
+        if [ -z "$country" ] || [ "$country" = "unknown" ]; then
+            country="vps"
+        fi
+        ASKED_TAG="${country}-${ASKED_PORT}"
+        echo -e "${GREEN} -> Đã tạo Tag tự động theo quốc gia và port: $ASKED_TAG${NC}"
     fi
 }
 
 ASKED_CERT=""
 ASKED_KEY=""
 ask_cert() {
-    read -p " Nhập đường dẫn Certificate [Để trống = dùng mặc định của hệ thống]: " ASKED_CERT
-    ASKED_CERT="${ASKED_CERT:-$INSTALL_DIR/certs/default/cert.pem}"
+    echo -e "${YELLOW} Đang quét các chứng chỉ (Certificate) có sẵn trong hệ thống...${NC}"
+    local cert_list=()
+    local key_list=()
     
-    read -p " Nhập đường dẫn Private Key [Để trống = dùng mặc định của hệ thống]: " ASKED_KEY
-    ASKED_KEY="${ASKED_KEY:-$INSTALL_DIR/certs/default/private.key}"
+    # Thêm chứng chỉ mặc định của hệ thống
+    cert_list+=("$INSTALL_DIR/certs/default/cert.pem")
+    key_list+=("$INSTALL_DIR/certs/default/private.key")
+    
+    # Tìm kiếm các chứng chỉ khác trong thư mục certs
+    if [ -d "$INSTALL_DIR/certs" ]; then
+        while IFS= read -r cert_file; do
+            if [[ "$cert_file" != *"default"* ]] && [[ -f "$cert_file" ]]; then
+                local dir_name
+                dir_name=$(dirname "$cert_file")
+                for k_file in "$dir_name"/*.key "$dir_name"/*.pem; do
+                    if [[ "$k_file" == *.key ]] && [[ -f "$k_file" ]]; then
+                        cert_list+=("$cert_file")
+                        key_list+=("$k_file")
+                        break
+                    fi
+                done
+            fi
+        done < <(find "$INSTALL_DIR/certs" -type f \( -name "*.pem" -o -name "*.crt" -o -name "*.cer" \) 2>/dev/null)
+    fi
+    
+    # Tìm kiếm trong thư mục acme.sh nếu có
+    if [ -d "/root/.acme.sh" ]; then
+        while IFS= read -r cert_file; do
+            if [[ -f "$cert_file" ]]; then
+                local dir_name
+                dir_name=$(dirname "$cert_file")
+                for k_file in "$dir_name"/*.key; do
+                    if [[ -f "$k_file" ]]; then
+                        cert_list+=("$cert_file")
+                        key_list+=("$k_file")
+                        break
+                    fi
+                done
+            fi
+        done < <(find "/root/.acme.sh" -maxdepth 2 -name "fullchain.cer" -o -name "*.cer" 2>/dev/null)
+    fi
+
+    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}                 DANH SÁCH CHỨNG CHỈ KHẢ DỤNG                   ${NC}"
+    echo -e "${CYAN}================================================================${NC}"
+    for i in "${!cert_list[@]}"; do
+        echo -e " ${GREEN}$((i + 1)).${NC} Cert: ${cert_list[$i]}"
+        echo -e "     Key:  ${key_list[$i]}"
+    done
+    echo -e " ${GREEN}0.${NC} Tự nhập đường dẫn thủ công"
+    echo -e "${CYAN}================================================================${NC}"
+    
+    read -p " Vui lòng chọn số thứ tự chứng chỉ [Mặc định 1]: " cert_choice
+    cert_choice="${cert_choice:-1}"
+    
+    if [ "$cert_choice" -eq 0 ]; then
+        read -p " Nhập đường dẫn Certificate: " ASKED_CERT
+        read -p " Nhập đường dẫn Private Key: " ASKED_KEY
+    elif [[ "$cert_choice" =~ ^[0-9]+$ ]] && [ "$cert_choice" -ge 1 ] && [ "$cert_choice" -le "${#cert_list[@]}" ]; then
+        local idx=$((cert_choice - 1))
+        ASKED_CERT="${cert_list[$idx]}"
+        ASKED_KEY="${key_list[$idx]}"
+    else
+        ASKED_CERT="${cert_list[0]}"
+        ASKED_KEY="${key_list[0]}"
+        echo -e "${YELLOW} Lựa chọn không hợp lệ, dùng chứng chỉ mặc định: $ASKED_CERT${NC}"
+    fi
     
     echo -e "${GREEN} -> Cert: $ASKED_CERT${NC}"
     echo -e "${GREEN} -> Key: $ASKED_KEY${NC}"
@@ -649,7 +738,9 @@ delete_node() {
 
     local real_idx=$((node_idx - 1))
     local node_tag
+    local node_port
     node_tag=$(jq -r --argjson idx "$real_idx" '.[$idx].tag // empty' "$NODES_FILE")
+    node_port=$(jq -r --argjson idx "$real_idx" '.[$idx].port // empty' "$NODES_FILE")
 
     if [ -z "$node_tag" ]; then
         echo -e "${RED}Lỗi: Số thứ tự node không hợp lệ!${NC}"
@@ -660,9 +751,15 @@ delete_node() {
     if command -v jq &> /dev/null; then
         jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
         jq --arg tag "$node_tag" '[.[] | select(.tag != $tag)]' "$DOMAIN_FILE" > "$DOMAIN_FILE.tmp" && mv "$DOMAIN_FILE.tmp" "$DOMAIN_FILE"
+        
         echo -e "${GREEN}Đã xóa node có tag: $node_tag${NC}"
+        
+        # Tự động đóng port nếu tìm thấy port hợp lệ
+        if [ -n "$node_port" ] && [[ "$node_port" =~ ^[0-9]+$ ]]; then
+            close_firewall_port "$node_port"
+        fi
+
         build_and_apply_config
-        echo -e "${YELLOW}(Lưu ý: Tường lửa không được đóng tự động để tránh xung đột hệ thống)${NC}"
     else
         echo -e "${RED}Thiếu công cụ jq để xử lý JSON.${NC}"
     fi

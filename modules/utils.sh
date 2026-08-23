@@ -340,6 +340,19 @@ get_random_unused_port() {
     done
 }
 
+# Lấy tên quốc gia theo IP của VPS hiện tại (Hỗ trợ dự phòng qua ipapi.co và ipinfo.io)
+get_vps_country() {
+    local country=""
+    country=$(curl -s --max-time 4 https://ipapi.co/country_name 2>/dev/null)
+    if [ -z "$country" ] || [ "$country" = "Undefined" ] || [[ "$country" == *"error"* ]]; then
+        country=$(curl -s --max-time 4 https://ipinfo.io/country 2>/dev/null)
+    fi
+    if [ -z "$country" ]; then
+        country="Unknown"
+    fi
+    echo "$country"
+}
+
 # ==========================================
 # CÁC HÀM XỬ LÝ JSON BẰNG JQ
 # ==========================================
