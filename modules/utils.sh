@@ -67,15 +67,18 @@ get_singbox_status() {
     fi
 }
 
-# Lấy phiên bản Sing-box core tối ưu
+# Lấy chính xác phiên bản Sing-box core từ dòng đầu tiên
 get_singbox_version() {
     local bin_path="/usr/local/bin/sing-box"
     if [ -f "$bin_path" ] && [ -x "$bin_path" ]; then
         local ver
-        # Tự động quét và bắt chuẩn chuỗi phiên bản (ví dụ: 1.13.14 hoặc v1.13.14)
-        ver=$($bin_path version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?' | head -n 1)
-        if [ -n "$ver" ]; then
+        # Lấy từ khóa ở cột thứ 3 của dòng đầu tiên (ví dụ: "sing-box version 1.13.14" -> "1.13.14" hoặc "unknown")
+        ver=$($bin_path version 2>/dev/null | head -n 1 | awk '{print $3}')
+        
+        if [ -n "$ver" ] && [ "$ver" != "unknown" ]; then
             echo -e "${CYAN}$ver${NC}"
+        elif [ "$ver" == "unknown" ]; then
+            echo -e "${YELLOW}unknown (Dev Build)${NC}"
         else
             echo -e "${YELLOW}Không xác định${NC}"
         fi
