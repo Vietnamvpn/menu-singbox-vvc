@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -34,12 +35,27 @@ type ApiConfig struct {
 	Port  int    `json:"port"`
 }
 
-// Cấu trúc User chuẩn: Lấy UUID từ Web gán vào Secret, giữ lại trường Status cho lệnh toggle_user
+// Cấu trúc User chuẩn
 type User struct {
 	Username string `json:"username"`
 	Tag      string `json:"tag"`
 	Secret   string `json:"secret"`
 	Status   string `json:"status,omitempty"`
+}
+
+// Cấu trúc Node đầy đủ để ghép link chuẩn theo utils.sh
+type Node struct {
+	Type        string `json:"type"`
+	Tag         string `json:"tag"`
+	Domain      string `json:"domain"`
+	Address     string `json:"address"`
+	Port        int    `json:"port"`
+	SNI         string `json:"sni"`
+	PublicKey   string `json:"public_key"`
+	ShortID     string `json:"short_id"`
+	WSPath      string `json:"ws_path"`
+	GRPCService string `json:"grpc_service"`
+	Password    string `json:"password"`
 }
 
 // Request từ Web trung tâm gửi sang để reset
@@ -56,9 +72,9 @@ type ResetResponse struct {
 
 // Cấu trúc Task nhận từ Web trung tâm qua action get_tasks
 type Task struct {
-	ID      interface{}     `json:"id"` // Đổi thành interface{} để nhận cả số (12) và chuỗi ("12")
+	ID      interface{}     `json:"id"`
 	Action  string          `json:"action"`
-	Payload json.RawMessage `json:"payload"` // Đổi thành json.RawMessage để nhận cả Object lẫn Chuỗi JSON
+	Payload json.RawMessage `json:"payload"`
 }
 
 type TasksResponse struct {
@@ -66,7 +82,7 @@ type TasksResponse struct {
 	Tasks  []Task `json:"tasks"`
 }
 
-// Cấu trúc Entry Node để thay thế IP/Port trước khi trả link
+// Cấu trúc Entry Node để thay thế IP/Port nếu có
 type EntryNode struct {
 	Tag    string `json:"tag"`
 	Domain string `json:"domain"`
@@ -76,10 +92,10 @@ type EntryNode struct {
 func main() {
 	os.MkdirAll(DataDir, 0755)
 
-	// Chạy tiến trình đồng bộ tổng hợp với node_sync.php (Đẩy inbounds, traffic, nhận task mỗi 1 phút)
+	// Chạy tiến trình đồng bộ tổng hợp với node_sync.php
 	go systemSyncRoutine()
 
-	// Mở HTTP API Server chờ lệnh tức thời từ Web trung tâm (ví dụ: Reset Token)
+	// Mở HTTP API Server chờ lệnh tức thời từ Web trung tâm
 	http.HandleFunc("/api/reset-password", handleResetPassword)
 
 	log.Printf("Sing-box Manager API Server đang chạy tại port %s", ListenAddr)
@@ -101,7 +117,7 @@ func getApiConfig() (string, string, int) {
 	return config.URL, config.Token, config.Port
 }
 
-// Helper gửi request POST chung đến node_sync.php theo chuẩn Header X-API-Port và X-API-Token
+// Helper gửi request POST chung đến node_sync.php
 func sendApiRequest(action string, payload map[string]interface{}, result interface{}) error {
 	baseURL, token, port := getApiConfig()
 	if baseURL == "" || token == "" {
@@ -194,7 +210,7 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	sendJSONResponse(w, "success", "Reset thành công", newLink)
 }
 
-// TIẾN TRÌNH ĐỒNG BỘ TỔNG HỢP VỚI node_sync.php (CHẠY MỖI 1 PHÚT)
+// TIẾN TRÌNH ĐỒNG BỘ TỔNG HỢP VỚI node_sync.php
 func systemSyncRoutine() {
 	ticker := time.NewTicker(1 * time.Minute)
 	for range ticker.C {
@@ -247,9 +263,7 @@ func executeTask(task Task) {
 
 	var payload map[string]interface{}
 	if len(task.Payload) > 0 {
-		// Thử giải mã nếu payload là Object JSON
 		if err := json.Unmarshal(task.Payload, &payload); err != nil {
-			// Nếu lỗi, thử giải mã nếu payload là String chứa JSON
 			var payloadStr string
 			if errStr := json.Unmarshal(task.Payload, &payloadStr); errStr == nil {
 				_ = json.Unmarshal([]byte(payloadStr), &payload)
@@ -267,7 +281,6 @@ func executeTask(task Task) {
 
 	switch actionType {
 	case "add_user", "create_user", "reset_token":
-		// Theo code PHP, web gửi ['uuid' => $uuid, 'username' => $username]
 		username, _ := payload["username"].(string)
 		uuid, _ := payload["uuid"].(string)
 
@@ -280,7 +293,7 @@ func executeTask(task Task) {
 			for i, u := range users {
 				if u.Username == username {
 					users[i].Secret = uuid
-					users[i].Status = "" // Xóa trạng thái disabled nếu user được add/reset lại
+					users[i].Status = ""
 					if users[i].Tag == "" {
 						users[i].Tag = "all"
 					}
@@ -337,7 +350,6 @@ func executeTask(task Task) {
 		}
 
 	case "toggle_user":
-		// Theo code PHP, web gửi ['username' => $username, 'uuid' => $uuid, 'status' => $status]
 		username, _ := payload["username"].(string)
 		status, _ := payload["status"].(string)
 
@@ -347,7 +359,7 @@ func executeTask(task Task) {
 			updated := false
 			for i := range users {
 				if users[i].Username == username {
-					users[i].Status = status // Cập nhật trạng thái (ví dụ: 'disabled')
+					users[i].Status = status
 					updated = true
 					break
 				}
@@ -427,13 +439,91 @@ func getEntryNodeInfo(tag string) (string, int) {
 			}
 		}
 	}
-	return "VPS_IP_OR_DOMAIN", 443
+	return "", 0
 }
 
+// Sinh link chi tiết cho từng Node theo đúng công thức trong modules/utils.sh
+func generateLinkForNode(u User, n Node) string {
+	entryDomain, entryPort := getEntryNodeInfo(n.Tag)
+
+	domain := entryDomain
+	if domain == "" {
+		if n.Domain != "" {
+			domain = n.Domain
+		} else if n.Address != "" {
+			domain = n.Address
+		} else {
+			domain = "VPS_IP_OR_DOMAIN"
+		}
+	}
+
+	port := entryPort
+	if port == 0 {
+		port = n.Port
+	}
+
+	sni := n.SNI
+	if sni == "" {
+		sni = domain
+	}
+
+	tagLabel := fmt.Sprintf("%s-%s", u.Username, n.Tag)
+
+	switch n.Type {
+	case "vless-reality":
+		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&type=tcp#%s",
+			u.Secret, domain, port, sni, n.PublicKey, n.ShortID, tagLabel)
+
+	case "vless-grpc-reality":
+		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&type=grpc&serviceName=%s#%s",
+			u.Secret, domain, port, sni, n.PublicKey, n.ShortID, n.GRPCService, tagLabel)
+
+	case "vless-ws-tls":
+		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=tls&sni=%s&type=ws&path=%s&allowInsecure=1#%s",
+			u.Secret, domain, port, sni, n.WSPath, tagLabel)
+
+	case "hysteria2":
+		return fmt.Sprintf("hysteria2://%s@%s:%d?sni=%s&insecure=1#%s",
+			u.Secret, domain, port, sni, tagLabel)
+
+	case "tuic":
+		return fmt.Sprintf("tuic://%s:%s@%s:%d?congestion_control=bbr&sni=%s&alpn=h3&insecure=1#%s",
+			u.Secret, n.Password, domain, port, sni, tagLabel)
+
+	default:
+		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
+			u.Secret, domain, port, sni, tagLabel)
+	}
+}
+
+// Tổng hợp danh sách link cho user dựa trên nodes.json
 func generateProxyLink(u User) string {
-	domain, port := getEntryNodeInfo(u.Tag)
+	data, err := os.ReadFile(nodesFile)
+	if err == nil {
+		var nodes []Node
+		if json.Unmarshal(data, &nodes) == nil && len(nodes) > 0 {
+			var links []string
+			for _, n := range nodes {
+				if u.Tag == "all" || u.Tag == "" || u.Tag == n.Tag {
+					links = append(links, generateLinkForNode(u, n))
+				}
+			}
+			if len(links) > 0 {
+				return strings.Join(links, "\n")
+			}
+		}
+	}
+
+	// Fallback nếu chưa có node nào trong nodes.json
+	entryDomain, entryPort := getEntryNodeInfo(u.Tag)
+	if entryDomain == "" {
+		entryDomain = "VPS_IP_OR_DOMAIN"
+	}
+	if entryPort == 0 {
+		entryPort = 443
+	}
 	return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
-		u.Secret, domain, port, domain, u.Username)
+		u.Secret, entryDomain, entryPort, entryDomain, u.Username)
 }
 
 func reloadSingbox() {
