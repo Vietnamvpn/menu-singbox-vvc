@@ -78,7 +78,7 @@ get_singbox_version() {
         if [ -n "$ver" ] && [ "$ver" != "unknown" ]; then
             echo -e "${CYAN}$ver${NC}"
         elif [ "$ver" == "unknown" ]; then
-            echo -e "${YELLOW}unknown${NC}"
+            echo -e "unknown"
         else
             echo -e "${YELLOW}Không xác định${NC}"
         fi
