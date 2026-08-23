@@ -34,15 +34,17 @@ type ApiConfig struct {
 	Port  int    `json:"port"`
 }
 
-// Dữ liệu User theo chuẩn file JSON
+// Dữ liệu User theo chuẩn file JSON (hỗ trợ cả UUID, Password và Secret)
 type User struct {
 	Username string `json:"username"`
 	UUID     string `json:"uuid,omitempty"`
 	Password string `json:"password,omitempty"`
+	Secret   string `json:"secret,omitempty"`
 	Protocol string `json:"protocol,omitempty"`
 	Type     string `json:"type,omitempty"`
-	Port     int    `json:"port"`
-	Tag      string `json:"tag"`
+	Port     int    `json:"port,omitempty"`
+	Tag      string `json:"tag,omitempty"`
+	Status   string `json:"status,omitempty"`
 }
 
 // Request từ Web trung tâm gửi sang để reset
@@ -182,6 +184,9 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 			if users[i].Password != "" {
 				users[i].Password = generateRandomString(16)
 			}
+			if users[i].Secret != "" {
+				users[i].Secret = generateUUID()
+			}
 			foundUser = &users[i]
 			break
 		}
@@ -247,13 +252,15 @@ func systemSyncRoutine() {
 	}
 }
 
-// Thực thi các lệnh task nhận từ web
+// Thực thi các lệnh task nhận từ web (Đã bổ sung logic cập nhật users.json và build lại config)
 func executeTask(task Task) {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 
 	var payload map[string]interface{}
-	_ = json.Unmarshal([]byte(task.Payload), &payload)
+	if task.Payload != "" {
+		_ = json.Unmarshal([]byte(task.Payload), &payload)
+	}
 
 	actionType := payload["action"]
 	if actionType == nil {
@@ -264,10 +271,96 @@ func executeTask(task Task) {
 	var errorMsg *string
 
 	switch actionType {
+	case "add_user", "create_user":
+		var newUser User
+		if payloadBytes, err := json.Marshal(payload); err == nil {
+			_ = json.Unmarshal(payloadBytes, &newUser)
+		}
+		if newUser.Username == "" {
+			if un, ok := payload["username"].(string); ok {
+				newUser.Username = un
+			}
+		}
+		if newUser.Secret == "" && newUser.UUID == "" && newUser.Password == "" {
+			newUser.Secret = generateUUID()
+		}
+
+		if newUser.Username != "" {
+			users, err := readUsers()
+			if err != nil {
+				users = []User{}
+			}
+			exists := false
+			for i, u := range users {
+				if u.Username == newUser.Username {
+					users[i] = newUser
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				users = append(users, newUser)
+			}
+			if err := writeUsers(users); err == nil {
+				log.Printf("[TASK] Đã thêm/cập nhật user từ web: %s", newUser.Username)
+				go reloadSingbox()
+			} else {
+				errMsg := err.Error()
+				errorMsg = &errMsg
+				taskStatus = "error"
+			}
+		} else {
+			errMsg := "Username trống trong payload add_user"
+			errorMsg = &errMsg
+			taskStatus = "error"
+		}
+
+	case "delete_user", "remove_user":
+		username, _ := payload["username"].(string)
+		if username != "" {
+			users, err := readUsers()
+			if err == nil {
+				var newUsers []User
+				found := false
+				for _, u := range users {
+					if u.Username != username {
+						newUsers = append(newUsers, u)
+					} else {
+						found = true
+					}
+				}
+				if found {
+					if err := writeUsers(newUsers); err == nil {
+						log.Printf("[TASK] Đã xóa user từ web: %s", username)
+						go reloadSingbox()
+					} else {
+						errMsg := err.Error()
+						errorMsg = &errMsg
+						taskStatus = "error"
+					}
+				}
+			}
+		}
+
 	case "toggle_user":
 		username, _ := payload["username"].(string)
 		status, _ := payload["status"].(string)
 		log.Printf("[TASK] Nhận lệnh toggle_user cho %s với trạng thái %s", username, status)
+		users, err := readUsers()
+		if err == nil {
+			updated := false
+			for i := range users {
+				if users[i].Username == username {
+					users[i].Status = status
+					updated = true
+					break
+				}
+			}
+			if updated {
+				writeUsers(users)
+				go reloadSingbox()
+			}
+		}
 
 	case "toggle_service":
 		state, _ := payload["state"].(string)
@@ -342,27 +435,35 @@ func generateProxyLink(u User) string {
 	if proto == "" {
 		proto = u.Type
 	}
+	secret := u.Secret
+	if secret == "" {
+		if u.UUID != "" {
+			secret = u.UUID
+		} else {
+			secret = u.Password
+		}
+	}
 
 	switch proto {
 	case "vless", "vless-reality":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
-			u.UUID, domain, port, domain, u.Username)
+			secret, domain, port, domain, u.Username)
 
 	case "vless-grpc", "vless-grpc-reality":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=grpc&security=reality&serviceName=grpc&sni=%s#%s",
-			u.UUID, domain, port, domain, u.Username)
+			secret, domain, port, domain, u.Username)
 
 	case "vless-ws", "vless-ws-tls":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=ws&security=tls&path=/vless&sni=%s#%s",
-			u.UUID, domain, port, domain, u.Username)
+			secret, domain, port, domain, u.Username)
 
 	case "hysteria2", "hy2":
 		return fmt.Sprintf("hy2://%s@%s:%d?sni=%s&insecure=1#%s",
-			u.Password, domain, port, domain, u.Username)
+			secret, domain, port, domain, u.Username)
 
 	case "tuic":
 		return fmt.Sprintf("tuic://%s:%s@%s:%d?sni=%s&congestion_control=bbr#%s",
-			u.UUID, u.Password, domain, port, domain, u.Username)
+			secret, secret, domain, port, domain, u.Username)
 
 	default:
 		return ""
