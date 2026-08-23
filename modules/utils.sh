@@ -386,6 +386,7 @@ build_and_apply_config() {
     local nodes_file="${INSTALL_DIR}/data/nodes.json"
     local users_file="${INSTALL_DIR}/data/users.json"
     local outbound_file="${INSTALL_DIR}/data/outbound.json"
+    local routing_file="${INSTALL_DIR}/data/routing.json"
     
     # 1. Kiểm tra file mẫu và file dữ liệu
     if [ ! -f "$base_config" ]; then
@@ -404,15 +405,22 @@ build_and_apply_config() {
         echo "[]" > "$outbound_file"
     fi
 
+    if [ ! -f "$routing_file" ]; then
+        echo "[]" > "$routing_file"
+    fi
+
     # 2. Kiểm tra thư mục đích
     if [ ! -d "/etc/sing-box" ]; then
         mkdir -p "/etc/sing-box"
     fi
 
-    log_info "Đang tổng hợp nodes, users và outbounds vào cấu hình..."
+    log_info "Đang tổng hợp nodes, users, outbounds và routing vào cấu hình..."
     
-    # 3. Sử dụng jq để kết hợp base_config, nodes, users và outbounds
-    if jq --slurpfile nodes "$nodes_file" --slurpfile users "$users_file" --slurpfile outbounds "$outbound_file" '
+    # 3. Sử dụng jq để kết hợp base_config, nodes, users, outbounds và routing rules
+    if jq --slurpfile nodes "$nodes_file" \
+          --slurpfile users "$users_file" \
+          --slurpfile outbounds "$outbound_file" \
+          --slurpfile routings "$routing_file" '
         .inbounds = [
             ($nodes[0][]? | . as $n | 
                 ([$users[0][]? | select(.tag == $n.tag or .tag == "all")]) as $matched_users |
@@ -516,7 +524,8 @@ build_and_apply_config() {
                 end
             )
         ] |
-        .outbounds = (.outbounds + $outbounds[0])
+        .outbounds = (.outbounds + [ $outbounds[0][]? | del(.raw_link) ]) |
+        .route.rules = ((.route.rules // []) + $routings[0])
     ' "$base_config" > "${dest_config}.tmp"; then
         
         mv "${dest_config}.tmp" "$dest_config"
