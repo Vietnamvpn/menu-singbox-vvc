@@ -23,7 +23,7 @@ render_outbound_menu() {
         echo -e " ${GREEN}2.${NC} Thêm Outbound từ Link Chia Sẻ (Share Link)"
         echo -e " ${GREEN}3.${NC} Sửa Outbound"
         echo -e " ${GREEN}4.${NC} Xóa Outbound"
-        echo -e " ${RED}0.${NC} Quay lại Menu Chính"
+        echo -e "${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-4]: " choice
 
@@ -130,7 +130,7 @@ add_outbound_manual() {
     read -p "Nhấn Enter để tiếp tục..."
 }
 
-# Thêm outbound từ link chia sẻ
+# Thêm outbound từ link chia sẻ (Đã tối ưu phân tích các trường kết nối chuẩn sing-box)
 add_outbound_from_link() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
     echo -e "${YELLOW} THÊM OUTBOUND TỪ LINK CHIA SẺ${NC}"
@@ -142,66 +142,147 @@ add_outbound_from_link() {
         return
     fi
 
-    local proto="${link%%://*}"
-    local remainder="${link#*://}"
-    local tag=""
+    local outbound_json
+    outbound_json=$(python3 -c '
+import sys
+import urllib.parse
+import json
+import time
 
-    if [[ "$remainder" == *#* ]]; then
-        tag="${remainder#*#}"
-        tag=$(python3 -c "import urllib.parse; print(urllib.parse.unquote('$tag'))" 2>/dev/null || echo "$tag")
-        remainder="${remainder%%#*}"
-    else
-        tag="node_$(date +%s)"
+link = sys.argv[1]
+try:
+    parsed = urllib.parse.urlparse(link)
+    scheme = parsed.scheme.lower()
+    
+    proto_map = {
+        "hy2": "hysteria2",
+        "hysteria2": "hysteria2",
+        "socks5": "socks",
+        "socks": "socks",
+        "ss": "shadowsocks",
+        "shadowsocks": "shadowsocks",
+        "vless": "vless",
+        "vmess": "vmess",
+        "trojan": "trojan",
+        "tuic": "tuic"
+    }
+    out_type = proto_map.get(scheme, scheme)
+    
+    tag = ""
+    if parsed.fragment:
+        tag = urllib.parse.unquote(parsed.fragment)
+    else:
+        tag = f"node_{int(time.time())}"
+        
+    hostname = parsed.hostname
+    port = parsed.port or 443
+    if not hostname:
+        print(json.dumps({"error": "Không thể xác định địa chỉ server từ link"}))
+        sys.exit(0)
+        
+    query = urllib.parse.parse_qs(parsed.query)
+    def get_q(key, default=""):
+        return query.get(key, [default])[0]
+
+    outbound = {
+        "type": out_type,
+        "tag": tag,
+        "server": hostname,
+        "server_port": int(port)
+    }
+    
+    if out_type == "hysteria2":
+        if parsed.username:
+            outbound["password"] = urllib.parse.unquote(parsed.username)
+        
+        sni = get_q("sni") or get_q("peer") or hostname
+        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1" or get_q("allowinsecure") == "true"
+        
+        outbound["tls"] = {
+            "enabled": True,
+            "server_name": sni,
+            "insecure": insecure
+        }
+        
+        obfs = get_q("obfs")
+        obfs_password = get_q("obfs-password") or get_q("obfs_password")
+        if obfs:
+            outbound["obfs"] = {
+                "type": obfs,
+                "password": obfs_password
+            }
+            
+    elif out_type == "vless":
+        if parsed.username:
+            outbound["uuid"] = urllib.parse.unquote(parsed.username)
+        
+        sni = get_q("sni") or get_q("peer") or hostname
+        security = get_q("security", "tls")
+        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1"
+        
+        if security == "reality":
+            outbound["tls"] = {
+                "enabled": True,
+                "server_name": sni,
+                "reality": {
+                    "enabled": True,
+                    "public_key": get_q("pbk"),
+                    "short_id": get_q("sid")
+                }
+            }
+        elif security == "tls":
+            outbound["tls"] = {
+                "enabled": True,
+                "server_name": sni,
+                "insecure": insecure
+            }
+            
+        flow = get_q("flow")
+        if flow:
+            outbound["flow"] = flow
+            
+    elif out_type == "trojan":
+        if parsed.username:
+            outbound["password"] = urllib.parse.unquote(parsed.username)
+        sni = get_q("sni") or hostname
+        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1"
+        outbound["tls"] = {
+            "enabled": True,
+            "server_name": sni,
+            "insecure": insecure
+        }
+        
+    print(json.dumps(outbound))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+' "$link")
+
+    if echo "$outbound_json" | jq -e '.error' >/dev/null 2>&1; then
+        local err_msg
+        err_msg=$(echo "$outbound_json" | jq -r '.error')
+        echo -e "${RED}[LỖI] $err_msg${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
     fi
+
+    local tag
+    tag=$(echo "$outbound_json" | jq -r '.tag')
 
     local exists
     exists=$(jq --arg t "$tag" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
     if [ "$exists" -gt 0 ]; then
         tag="${tag}_$(date +%s)"
+        outbound_json=$(echo "$outbound_json" | jq --arg t "$tag" '.tag = $t')
     fi
 
-    local server=""
-    local port=""
-    local type="$proto"
+    jq --argjson new_node "$outbound_json" '. += [$new_node]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
 
-    case "$proto" in
-        hy2|hysteria2) type="hysteria2" ;;
-        socks5|socks) type="socks" ;;
-        ss|shadowsocks) type="shadowsocks" ;;
-        vless) type="vless" ;;
-        vmess) type="vmess" ;;
-        trojan) type="trojan" ;;
-        tuic) type="tuic" ;;
-        *) type="$proto" ;;
-    esac
+    local type_val server_val port_val
+    type_val=$(echo "$outbound_json" | jq -r '.type')
+    server_val=$(echo "$outbound_json" | jq -r '.server')
+    port_val=$(echo "$outbound_json" | jq -r '.server_port')
 
-    local authority="${remainder%%\?*}"
-    if [[ "$authority" == *@* ]]; then
-        authority="${authority#*@}"
-    fi
-
-    if [[ "$authority" == \[*\]* ]]; then
-        server="${authority%%\]*}]"
-        port="${authority##*\]:}"
-    else
-        server="${authority%%:*}"
-        port="${authority##*:}"
-    fi
-
-    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-        port="443"
-    fi
-
-    if [ -z "$server" ]; then
-        echo -e "${RED}[LỖI] Không thể phân tích được địa chỉ Server từ link này.${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    jq --arg t "$tag" --arg tp "$type" --arg s "$server" --argjson p "$port" --arg l "$link" \
-       '. += [{"type": $tp, "tag": $t, "server": $s, "server_port": $p, "raw_link": $l}]' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
-
-    log_success "Đã thêm outbound '$tag' (Loại: $type, Server: $server:$port) thành công!"
+    log_success "Đã thêm outbound '$tag' (Loại: $type_val, Server: $server_val:$port_val) thành công!"
     
     if declare -f build_and_apply_config > /dev/null; then
         build_and_apply_config
