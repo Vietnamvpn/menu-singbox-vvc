@@ -611,7 +611,7 @@ generate_vless_grpc_reality_link() {
     echo "$link"
 }
 
-# Ráp link cho VLESS WS TLS
+# Ráp link cho VLESS WS TLS (Thêm &allowInsecure=1)
 generate_vless_ws_tls_link() {
     local tag="$1"
     local address="$2"
@@ -620,12 +620,12 @@ generate_vless_ws_tls_link() {
     local domain="$5"
     local ws_path="$6"
     
-    local link="vless://${uuid}@${address}:${port}?encryption=none&security=tls&sni=${domain}&type=ws&path=${ws_path}#${tag}"
+    local link="vless://${uuid}@${address}:${port}?encryption=none&security=tls&sni=${domain}&type=ws&path=${ws_path}&allowInsecure=1#${tag}"
     
     echo "$link"
 }
 
-# Ráp link cho Hysteria2
+# Ráp link cho Hysteria2 (Thêm &insecure=1)
 generate_hysteria2_link() {
     local tag="$1"
     local address="$2"
@@ -633,12 +633,12 @@ generate_hysteria2_link() {
     local password="$4"
     local domain="$5"
     
-    local link="hysteria2://${password}@${address}:${port}?sni=${domain}#${tag}"
+    local link="hysteria2://${password}@${address}:${port}?sni=${domain}&insecure=1#${tag}"
     
     echo "$link"
 }
 
-# Ráp link cho TUIC
+# Ráp link cho TUIC (Thêm &insecure=1)
 generate_tuic_link() {
     local tag="$1"
     local address="$2"
@@ -647,7 +647,7 @@ generate_tuic_link() {
     local password="$5"
     local domain="$6"
     
-    local link="tuic://${uuid}:${password}@${address}:${port}?congestion_control=bbr&sni=${domain}&alpn=h3#${tag}"
+    local link="tuic://${uuid}:${password}@${address}:${port}?congestion_control=bbr&sni=${domain}&alpn=h3&insecure=1#${tag}"
     
     echo "$link"
 }
