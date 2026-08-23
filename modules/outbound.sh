@@ -161,11 +161,16 @@ try:
         sni = get_q("sni") or get_q("peer") or hostname
         security = get_q("security", "tls")
         insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1"
+        fp = get_q("fp") or "chrome"
         
         if security == "reality":
             outbound["tls"] = {
                 "enabled": True,
                 "server_name": sni,
+                "utls": {
+                    "enabled": True,
+                    "fingerprint": fp
+                },
                 "reality": {
                     "enabled": True,
                     "public_key": get_q("pbk"),
@@ -178,10 +183,31 @@ try:
                 "server_name": sni,
                 "insecure": insecure
             }
+            if fp:
+                outbound["tls"]["utls"] = {
+                    "enabled": True,
+                    "fingerprint": fp
+                }
             
         flow = get_q("flow")
         if flow:
             outbound["flow"] = flow
+            
+        # Xử lý transport (grpc, ws)
+        net_type = get_q("type", "tcp")
+        if net_type == "grpc":
+            service_name = get_q("serviceName") or get_q("servicename")
+            if service_name:
+                outbound["transport"] = {
+                    "type": "grpc",
+                    "service_name": service_name
+                }
+        elif net_type == "ws":
+            path = get_q("path") or "/"
+            outbound["transport"] = {
+                "type": "ws",
+                "path": path
+            }
             
     elif out_type == "tuic":
         if ":" in userinfo:
