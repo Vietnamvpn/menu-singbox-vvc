@@ -130,36 +130,32 @@ update_singbox_core() {
 
     log_info "Đang lấy thông tin bản phát hành mới nhất từ GitHub..."
     local latest_tag
-    latest_tag=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    latest_tag=$(curl -s https://api.github.com/repos/Vietnamvpn/sing-box/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     
     if [ -z "$latest_tag" ]; then
         log_error "Không thể lấy thông tin phiên bản mới từ GitHub API!"
     fi
 
     log_info "Phiên bản mới nhất trên GitHub: $latest_tag"
-    local version_clean=${latest_tag#v}
     
-    local download_url="https://github.com/SagerNet/sing-box/releases/download/${latest_tag}/sing-box-${version_clean}-linux-${arch}.tar.gz"
+    local download_url="https://github.com/Vietnamvpn/sing-box/releases/download/${latest_tag}/sing-box-linux-${arch}"
     
     log_info "Đang tải xuống Sing-box Core..."
     cd /tmp
-    if ! curl -L -o sing-box.tar.gz "$download_url"; then
+    if ! curl -L -o sing-box "$download_url"; then
         log_error "Tải xuống Sing-box Core thất bại!"
     fi
 
-    log_info "Đang giải nén và cài đặt Core..."
-    tar -xzf sing-box.tar.gz
-    local extracted_dir="sing-box-${version_clean}-linux-${arch}"
-    
-    if [ -f "${extracted_dir}/sing-box" ]; then
-        cp "${extracted_dir}/sing-box" /usr/local/bin/sing-box
+    log_info "Đang cài đặt Core..."
+    if [ -f "sing-box" ]; then
+        cp sing-box /usr/local/bin/sing-box
         chmod +x /usr/local/bin/sing-box
-        rm -rf sing-box.tar.gz "${extracted_dir}"
+        rm -f sing-box
         log_success "Cập nhật Sing-box Core thành công lên phiên bản $latest_tag!"
         restart_singbox
     else
-        rm -rf sing-box.tar.gz "${extracted_dir}"
-        log_error "Không tìm thấy tệp nhị phân sing-box sau khi giải nén!"
+        rm -f sing-box
+        log_error "Không tìm thấy tệp nhị phân sing-box sau khi tải xuống!"
     fi
 }
 
