@@ -108,8 +108,8 @@ if [ ! -f "$INSTALL_DIR/certs/default/cert.pem" ]; then
     log_success "Tạo chứng chỉ SSL mặc định thành công."
 fi
 
-# 7. Tải và Cài đặt Sing-box Core mới nhất
-log_info "Đang kiểm tra và tải phiên bản Sing-box Core mới nhất..."
+# 7. Tải và Cài đặt Sing-box Core phiên bản tùy chỉnh từ Vietnamvpn/sing-box (v1.13.14)
+log_info "Đang tải phiên bản Sing-box Core v1.13.14 từ Vietnamvpn/sing-box..."
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64) SINGBOX_ARCH="amd64" ;;
@@ -117,21 +117,15 @@ case "$ARCH" in
     *) log_error "Kiến trúc CPU không được hỗ trợ: $ARCH" ;;
 esac
 
-LATEST_RELEASE=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r '.tag_name' | sed 's/^v//')
-if [ -z "$LATEST_RELEASE" ] || [ "$LATEST_RELEASE" == "null" ]; then
-    LATEST_RELEASE="1.9.3"
+VERSION="v1.13.14"
+DOWNLOAD_URL="https://github.com/Vietnamvpn/sing-box/releases/download/${VERSION}/sing-box-linux-${SINGBOX_ARCH}"
+
+log_info "Đang tải xuống Sing-box ${VERSION} (${SINGBOX_ARCH})..."
+if ! wget -q "$DOWNLOAD_URL" -O /usr/local/bin/sing-box; then
+    curl -L -o /usr/local/bin/sing-box "$DOWNLOAD_URL" || log_error "Tải xuống Sing-box Core thất bại!"
 fi
-
-TAR_NAME="sing-box-${LATEST_RELEASE}-linux-${SINGBOX_ARCH}.tar.gz"
-DOWNLOAD_URL="https://github.com/SagerNet/sing-box/releases/download/v${LATEST_RELEASE}/${TAR_NAME}"
-
-log_info "Tải Sing-box v${LATEST_RELEASE} (${SINGBOX_ARCH})..."
-wget -q "$DOWNLOAD_URL" -O /tmp/sing-box.tar.gz
-tar -xzf /tmp/sing-box.tar.gz -C /tmp/
-cp /tmp/sing-box-${LATEST_RELEASE}-linux-${SINGBOX_ARCH}/sing-box /usr/local/bin/
 chmod +x /usr/local/bin/sing-box
-rm -rf /tmp/sing-box*
-log_success "Cài đặt Sing-box Core v${LATEST_RELEASE} thành công."
+log_success "Cài đặt Sing-box Core ${VERSION} thành công."
 
 # 8. Biên dịch Go Daemon (api_server.go)
 if [ -f "$INSTALL_DIR/core/api_server.go" ]; then
