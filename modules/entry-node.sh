@@ -22,7 +22,7 @@ render_entry_node_menu() {
         echo -e " ${GREEN}1.${NC} Thêm Entry Node"
         echo -e " ${GREEN}2.${NC} Sửa Entry Node"
         echo -e " ${GREEN}3.${NC} Xóa Entry Node"
-        echo -e "${RED}0.${NC} Quay lại Menu Chính"
+        echo -e " ${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-3]: " choice
 
@@ -80,14 +80,42 @@ add_entry_node() {
     
     local nodes_file="${INSTALL_DIR}/data/nodes.json"
     if [ ! -s "$nodes_file" ] || [ "$(jq length "$nodes_file" 2>/dev/null)" -eq 0 ]; then
-        echo -e "${RED}[LỖI] Chưa có Node (Inbound) nào trong hệ thống! Vui lòng tạo node trước.${NC}"
+        echo -e "${RED}[LỖI] Chưa có Node (Inbound) nào trong hệ thống! Vول lòng tạo node trước.${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
     echo -e "${CYAN}Danh sách Node (Inbound) hiện có:${NC}"
-    jq -r '.[] | " - Tag: \(.tag) [Loại: \(.type)]"' "$nodes_file"
     echo -e "${CYAN}--------------------------------------------------${NC}"
+    printf "${CYAN}%-4s${NC} | ${GREEN}%-20s${NC} | ${BLUE}%-15s${NC}\n" "STT" "Tag Node" "Loại (Type)"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    
+    local node_count
+    node_count=$(jq length "$nodes_file")
+    for ((j=0; j<node_count; j++)); do
+        local n_tag n_type
+        n_tag=$(jq -r --argjson idx "$j" '.[$idx].tag // "N/A"' "$nodes_file")
+        n_type=$(jq -r --argjson idx "$j" '.[$idx].type // "N/A"' "$nodes_file")
+        printf "%-4d | %-20s | %-15s\n" "$((j+1))" "$n_tag" "$n_type"
+    done
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+
+    read -p "Nhập số thứ tự (STT) của Node cần liên kết: " node_index_input
+    if ! [[ "$node_index_input" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}[LỖI] STT phải là một số nguyên hợp lệ!${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    local n_idx=$((node_index_input - 1))
+    if [ "$n_idx" -lt 0 ] || [ "$n_idx" -ge "$node_count" ]; then
+        echo -e "${RED}[LỖI] Số thứ tự node ($node_index_input) không tồn tại!${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    local node_tag
+    node_tag=$(jq -r --argjson idx "$n_idx" '.[$idx].tag' "$nodes_file")
 
     read -p "Nhập Tên / Tag định danh cho Entry Node (vd: entry-us-1): " tag
     if [ -z "$tag" ]; then
@@ -100,21 +128,6 @@ add_entry_node() {
     exists=$(jq --arg t "$tag" '[.[] | select(.tag == $t)] | length' "$ENTRY_NODE_FILE")
     if [ "$exists" -gt 0 ]; then
         echo -e "${RED}[LỖI] Tag '$tag' đã tồn tại! Vui lòng chọn tên khác.${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    read -p "Nhập Tag của Node cần liên kết (Node Tag tương ứng): " node_tag
-    if [ -z "$node_tag" ]; then
-        echo -e "${RED}[LỖI] Node Tag không được để trống!${NC}"
-        read -p "Nhấn Enter để tiếp tục..."
-        return
-    fi
-
-    local node_exists
-    node_exists=$(jq --arg nt "$node_tag" '[.[] | select(.tag == $nt)] | length' "$nodes_file")
-    if [ "$node_exists" -eq 0 ]; then
-        echo -e "${RED}[LỖI] Node Tag '$node_tag' không tồn tại trong hệ thống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -193,22 +206,38 @@ edit_entry_node() {
     fi
 
     local nodes_file="${INSTALL_DIR}/data/nodes.json"
-    echo -e "${CYAN}Danh sách Node (Inbound) hiện có:${NC}"
-    if [ -f "$nodes_file" ]; then
-        jq -r '.[] | " - Tag: \(.tag) [Loại: \(.type)]"' "$nodes_file"
-    fi
-    echo -e "${CYAN}--------------------------------------------------${NC}"
+    local new_node_tag="$old_node_tag"
 
-    read -p "Nhập Node Tag liên kết mới [Mặc định: $old_node_tag]: " new_node_tag
-    new_node_tag="${new_node_tag:-$old_node_tag}"
+    if [ -s "$nodes_file" ] && [ "$(jq length "$nodes_file" 2>/dev/null)" -gt 0 ]; then
+        echo -e "${CYAN}Danh sách Node (Inbound) hiện có:${NC}"
+        echo -e "${CYAN}--------------------------------------------------${NC}"
+        printf "${CYAN}%-4s${NC} | ${GREEN}%-20s${NC} | ${BLUE}%-15s${NC}\n" "STT" "Tag Node" "Loại (Type)"
+        echo -e "${CYAN}--------------------------------------------------${NC}"
+        
+        local node_count
+        node_count=$(jq length "$nodes_file")
+        for ((j=0; j<node_count; j++)); do
+            local n_tag n_type
+            n_tag=$(jq -r --argjson idx "$j" '.[$idx].tag // "N/A"' "$nodes_file")
+            n_type=$(jq -r --argjson idx "$j" '.[$idx].type // "N/A"' "$nodes_file")
+            printf "%-4d | %-20s | %-15s\n" "$((j+1))" "$n_tag" "$n_type"
+        done
+        echo -e "${CYAN}--------------------------------------------------${NC}"
 
-    if [ -n "$new_node_tag" ] && [ -f "$nodes_file" ]; then
-        local node_exists
-        node_exists=$(jq --arg nt "$new_node_tag" '[.[] | select(.tag == $nt)] | length' "$nodes_file")
-        if [ "$node_exists" -eq 0 ]; then
-            echo -e "${RED}[LỖI] Node Tag '$new_node_tag' không tồn tại trong hệ thống!${NC}"
-            read -p "Nhấn Enter để tiếp tục..."
-            return
+        read -p "Nhập STT Node mới [Bỏ trống để giữ nguyên: $old_node_tag]: " node_index_input
+        if [ -n "$node_index_input" ]; then
+            if ! [[ "$node_index_input" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}[LỖI] STT phải là một số nguyên hợp lệ!${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            local n_idx=$((node_index_input - 1))
+            if [ "$n_idx" -lt 0 ] || [ "$n_idx" -ge "$node_count" ]; then
+                echo -e "${RED}[LỖI] Số thứ tự node không hợp lệ!${NC}"
+                read -p "Nhấn Enter để tiếp tục..."
+                return
+            fi
+            new_node_tag=$(jq -r --argjson idx "$n_idx" '.[$idx].tag' "$nodes_file")
         fi
     fi
 
