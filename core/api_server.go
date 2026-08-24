@@ -257,14 +257,14 @@ func systemSyncRoutine() {
 		func() {
 			logs := []map[string]interface{}{}
 
-			// Tự động kiểm tra và cài đặt grpcurl nếu hệ thống chưa có
+			// Cài đặt grpcurl nếu VPS chưa có sẵn
 			if _, err := exec.LookPath("grpcurl"); err != nil {
 				_ = exec.Command("apt-get", "update", "-y").Run()
 				_ = exec.Command("apt-get", "install", "-y", "grpcurl").Run()
 			}
 
-			// Truy vấn gRPC StatsService của Sing-box qua grpcurl
-			cmd := exec.Command("grpcurl", "-plaintext", "-d", `{"pattern": "user>>>", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
+			// Truy vấn StatsService của Sing-box qua cổng 10085
+			cmd := exec.Command("grpcurl", "-plaintext", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
 			output, err := cmd.Output()
 			if err == nil && len(output) > 0 {
 				var statsResp SingboxStatsResponse
@@ -276,6 +276,7 @@ func systemSyncRoutine() {
 
 					userTraffic := make(map[string]map[string]int64)
 					for _, s := range statsList {
+						// Định dạng stat: user>>>USERNAME>>>traffic>>>uplink
 						parts := strings.Split(s.Name, ">>>")
 						if len(parts) >= 4 && parts[0] == "user" && parts[2] == "traffic" {
 							username := parts[1]
@@ -300,14 +301,10 @@ func systemSyncRoutine() {
 							"download": t["download"],
 						})
 					}
-				} else {
-					log.Printf("[TRAFFIC ERROR] Lỗi giải mã JSON từ grpcurl: %v", err)
 				}
-			} else if err != nil {
-				log.Printf("[TRAFFIC ERROR] Lỗi thực thi grpcurl: %v", err)
 			}
 
-			// Lưu danh sách traffic report vào traffic_report.json trước khi gửi đi
+			// Lưu danh sách traffic report vào traffic_report.json
 			trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
 			if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
 				_ = os.WriteFile(trafficReportFile, reportData, 0644)
