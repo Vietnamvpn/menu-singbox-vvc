@@ -249,6 +249,20 @@ func systemSyncRoutine() {
 		func() {
 			logs := []map[string]interface{}{}
 
+			// Ví dụ: gọi lệnh truy vấn stats từ sing-box (nếu có command-line hỗ trợ) hoặc đọc từ module ngoài
+			// Nếu hệ thống dùng lệnh sing-box stats, ta có thể chạy qua exec.Command
+			cmd := exec.Command("sing-box", "stats", "-c", "/opt/menu-singbox-vvc/data/config.json") // Hoặc lệnh tương đương trong menu của bạn
+			if output, err := cmd.Output(); err == nil {
+				// Parse kết quả nếu tool trả về JSON, ví dụ:
+				_ = json.Unmarshal(output, &logs)
+			}
+
+			// Nếu chưa có lệnh trực tiếp, ta có thể để trống hoặc đọc file log định dạng traffic nếu có.
+			// Đảm bảo logs luôn là slice map hợp lệ để ghi file và gửi đi.
+			if logs == nil {
+				logs = []map[string]interface{}{}
+			}
+
 			// Lưu danh sách traffic report vào traffic_report.json trước khi gửi đi
 			trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
 			if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
