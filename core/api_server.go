@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -97,6 +98,14 @@ type SingboxStatsResponse struct {
 func main() {
 	os.MkdirAll(DataDir, 0755)
 	os.MkdirAll(LogDir, 0755)
+
+	// Cấu hình ghi log ra đồng thời màn hình console và file server.log
+	logFile, err := os.OpenFile(filepath.Join(LogDir, "server.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+	} else {
+		log.Printf("Không thể mở file log hệ thống: %v", err)
+	}
 
 	go systemSyncRoutine()
 
@@ -210,6 +219,8 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	fileMutex.Unlock()
 
 	newLink := generateProxyLink(*foundUser)
+	log.Printf("[RESET LINK] User: %s | Link mới được cấp: %s", foundUser.Username, newLink)
+
 	go reloadSingbox()
 
 	sendJSONResponse(w, "success", "Reset thành công", newLink)
@@ -304,6 +315,7 @@ func systemSyncRoutine() {
 							_ = os.WriteFile(trafficReportFile, reportData, 0644)
 						}
 
+						log.Printf("[TRAFFIC REPORT] Đang gửi dữ liệu sử dụng của %d user lên web", len(logs))
 						_ = sendApiRequest("report_traffic", map[string]interface{}{
 							"logs": logs,
 						}, nil)
