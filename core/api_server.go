@@ -39,7 +39,7 @@ type ApiConfig struct {
 type User struct {
 	Username string `json:"username"`
 	Tag      string `json:"tag"`
-	Secret   string `json:"secret"`
+	UUID     string `json:"uuid"`
 	Status   string `json:"status,omitempty"`
 }
 
@@ -190,7 +190,7 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	var foundUser *User
 	for i := range users {
 		if users[i].Username == req.Username {
-			users[i].Secret = generateUUID()
+			users[i].UUID = generateUUID()
 			foundUser = &users[i]
 			break
 		}
@@ -215,9 +215,7 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	sendJSONResponse(w, "success", "Reset thành công", newLink)
 }
 
-// TIẾN TRÌNH ĐỒNG BỘ TỔNG HỢP VỚI node_sync.php
 func systemSyncRoutine() {
-	// Cài đặt grpcurl nếu VPS chưa có sẵn (chỉ kiểm tra 1 lần khi khởi chạy tiến trình)
 	if _, err := exec.LookPath("grpcurl"); err != nil {
 		_ = exec.Command("apt-get", "update", "-y").Run()
 		_ = exec.Command("apt-get", "install", "-y", "grpcurl").Run()
@@ -263,7 +261,6 @@ func systemSyncRoutine() {
 		func() {
 			logs := []map[string]interface{}{}
 
-			// Truy vấn StatsService của Sing-box qua cổng 10085
 			cmd := exec.Command("grpcurl", "-plaintext", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
 			output, err := cmd.Output()
 			if err == nil && len(output) > 0 {
@@ -276,7 +273,6 @@ func systemSyncRoutine() {
 
 					userTraffic := make(map[string]map[string]int64)
 					for _, s := range statsList {
-						// Định dạng stat: user>>>USERNAME>>>traffic>>>uplink
 						parts := strings.Split(s.Name, ">>>")
 						if len(parts) >= 4 && parts[0] == "user" && parts[2] == "traffic" {
 							username := parts[1]
@@ -302,7 +298,6 @@ func systemSyncRoutine() {
 						})
 					}
 
-					// Chỉ ghi file traffic_report.json và gửi API khi thực sự có dữ liệu lưu lượng
 					if len(logs) > 0 {
 						trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
 						if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
@@ -363,7 +358,7 @@ func executeTask(task Task) bool {
 			exists := false
 			for i, u := range users {
 				if u.Username == username {
-					users[i].Secret = uuid
+					users[i].UUID = uuid
 					if status != "" {
 						users[i].Status = status
 					}
@@ -381,7 +376,7 @@ func executeTask(task Task) bool {
 				users = append(users, User{
 					Username: username,
 					Tag:      "all",
-					Secret:   uuid,
+					UUID:     uuid,
 					Status:   status,
 				})
 			}
@@ -549,27 +544,27 @@ func generateLinkForNode(u User, n Node) string {
 	switch n.Type {
 	case "vless-reality":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&type=tcp#%s",
-			u.Secret, domain, port, sni, n.PublicKey, n.ShortID, tagLabel)
+			u.UUID, domain, port, sni, n.PublicKey, n.ShortID, tagLabel)
 
 	case "vless-grpc-reality":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&type=grpc&serviceName=%s#%s",
-			u.Secret, domain, port, sni, n.PublicKey, n.ShortID, n.GRPCService, tagLabel)
+			u.UUID, domain, port, sni, n.PublicKey, n.ShortID, n.GRPCService, tagLabel)
 
 	case "vless-ws-tls":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=tls&sni=%s&type=ws&path=%s&allowInsecure=1#%s",
-			u.Secret, domain, port, sni, n.WSPath, tagLabel)
+			u.UUID, domain, port, sni, n.WSPath, tagLabel)
 
 	case "hysteria2":
 		return fmt.Sprintf("hysteria2://%s@%s:%d?sni=%s&insecure=1#%s",
-			u.Secret, domain, port, sni, tagLabel)
+			u.UUID, domain, port, sni, tagLabel)
 
 	case "tuic":
 		return fmt.Sprintf("tuic://%s:%s@%s:%d?congestion_control=bbr&sni=%s&alpn=h3&insecure=1#%s",
-			u.Secret, n.Password, domain, port, sni, tagLabel)
+			u.UUID, n.Password, domain, port, sni, tagLabel)
 
 	default:
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
-			u.Secret, domain, port, sni, tagLabel)
+			u.UUID, domain, port, sni, tagLabel)
 	}
 }
 
@@ -598,14 +593,14 @@ func generateProxyLink(u User) string {
 		entryPort = 443
 	}
 	return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
-		u.Secret, entryDomain, entryPort, entryDomain, u.Username)
+		u.UUID, entryDomain, entryPort, entryDomain, u.Username)
 }
 
 func reloadSingbox() {
 	reloadMutex.Lock()
 	defer reloadMutex.Unlock()
 
-	cmd := exec.Command("bash", "-c", "source /opt/menu-singbox-vvc/modules/utils.sh && build_and_apply_config")
+	cmd := exec.Command("bash", "-c", "source /opt/menu-singbox-vvc/modules/utils.sh && build_and_apply_config /opt/menu-singbox-vvc/templates/config.base.json /etc/sing-box/config.json")
 	if err := cmd.Run(); err != nil {
 		log.Printf("Lỗi khi tải lại sing-box: %v", err)
 	} else {
