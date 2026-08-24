@@ -232,15 +232,21 @@ func systemSyncRoutine() {
 		_ = exec.Command("apt-get", "install", "-y", "grpcurl").Run()
 	}
 
+	// Tạo file proto tạm thời để hỗ trợ grpcurl khi server không bật reflection
+	protoContent := `syntax = "proto3";
+package v2ray.core.app.stats.command;
+message QueryStatsRequest { string pattern = 1; bool reset = 2; }
+message Stat { string name = 1; int64 value = 2; }
+message QueryStatsResponse { repeated Stat stat = 1; repeated Stat stats = 2; }
+service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResponse); }`
+	_ = os.WriteFile("/tmp/stats.proto", []byte(protoContent), 0644)
+
 	ticker := time.NewTicker(1 * time.Minute)
 	for range ticker.C {
 		baseURL, token, _ := getApiConfig()
 		if baseURL == "" || token == "" {
 			continue
 		}
-
-		// Đã tắt hoàn toàn tính năng tự động gửi report_inbounds định kỳ ngầm tại đây.
-		// Việc gửi thông tin / link node được chuyển hoàn toàn sang thao tác thủ công trên api-web.sh.
 
 		func() {
 			var taskResp TasksResponse
@@ -262,7 +268,7 @@ func systemSyncRoutine() {
 		func() {
 			logs := []map[string]interface{}{}
 
-			cmd := exec.Command("grpcurl", "-plaintext", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
+			cmd := exec.Command("grpcurl", "-plaintext", "-proto", "/tmp/stats.proto", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
 			output, err := cmd.Output()
 			if err == nil && len(output) > 0 {
 				var statsResp SingboxStatsResponse
