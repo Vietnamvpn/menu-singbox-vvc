@@ -290,7 +290,8 @@ add_user() {
        '. += [{
            "username": $username,
            "tag": $tag,
-           "secret": $secret
+           "secret": $secret,
+           "status": "active"
        }]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"; then
         echo -e "${GREEN}Thêm User thành công!${NC}"
         build_and_apply_config
