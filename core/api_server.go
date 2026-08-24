@@ -268,54 +268,76 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 		func() {
 			logs := []map[string]interface{}{}
 
-			cmd := exec.Command("grpcurl", "-plaintext", "-import-path", "/tmp", "-proto", "/tmp/stats.proto", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
+			grpcurlPath, err := exec.LookPath("grpcurl")
+			if err != nil {
+				grpcurlPath = "grpcurl"
+			}
+
+			cmd := exec.Command(grpcurlPath, "-plaintext", "-import-path", "/tmp", "-proto", "/tmp/stats.proto", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
+
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
 			output, err := cmd.Output()
-			if err == nil && len(output) > 0 {
+
+			if err != nil {
+				log.Printf("[TRAFFIC LỖI] Lệnh grpcurl thất bại: %v | Stderr: %s", err, stderr.String())
+				return
+			}
+
+			if len(output) > 0 {
 				var statsResp SingboxStatsResponse
-				if err := json.Unmarshal(output, &statsResp); err == nil {
-					statsList := statsResp.Stat
-					if len(statsList) == 0 {
-						statsList = statsResp.Stats
-					}
+				if err := json.Unmarshal(output, &statsResp); err != nil {
+					log.Printf("[TRAFFIC LỖI] Parse JSON từ grpcurl thất bại: %v", err)
+					return
+				}
 
-					userTraffic := make(map[string]map[string]int64)
-					for _, s := range statsList {
-						parts := strings.Split(s.Name, ">>>")
-						if len(parts) >= 4 && parts[0] == "user" && parts[2] == "traffic" {
-							username := parts[1]
-							trafficType := parts[3]
+				statsList := statsResp.Stat
+				if len(statsList) == 0 {
+					statsList = statsResp.Stats
+				}
 
-							if _, exists := userTraffic[username]; !exists {
-								userTraffic[username] = map[string]int64{"upload": 0, "download": 0}
-							}
+				userTraffic := make(map[string]map[string]int64)
+				for _, s := range statsList {
+					parts := strings.Split(s.Name, ">>>")
+					if len(parts) >= 4 && parts[0] == "user" && parts[2] == "traffic" {
+						username := parts[1]
+						trafficType := parts[3]
 
-							if trafficType == "uplink" || trafficType == "up" {
-								userTraffic[username]["upload"] += s.Value
-							} else if trafficType == "downlink" || trafficType == "down" {
-								userTraffic[username]["download"] += s.Value
-							}
-						}
-					}
-
-					for u, t := range userTraffic {
-						logs = append(logs, map[string]interface{}{
-							"username": u,
-							"upload":   t["upload"],
-							"download": t["download"],
-						})
-					}
-
-					if len(logs) > 0 {
-						trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
-						if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
-							_ = os.WriteFile(trafficReportFile, reportData, 0644)
+						if _, exists := userTraffic[username]; !exists {
+							userTraffic[username] = map[string]int64{"upload": 0, "download": 0}
 						}
 
-						log.Printf("[TRAFFIC REPORT] Đang gửi dữ liệu sử dụng của %d user lên web", len(logs))
-						_ = sendApiRequest("report_traffic", map[string]interface{}{
-							"logs": logs,
-						}, nil)
+						if trafficType == "uplink" || trafficType == "up" {
+							userTraffic[username]["upload"] += s.Value
+						} else if trafficType == "downlink" || trafficType == "down" {
+							userTraffic[username]["download"] += s.Value
+						}
 					}
+				}
+
+				for u, t := range userTraffic {
+					logs = append(logs, map[string]interface{}{
+						"username": u,
+						"upload":   t["upload"],
+						"download": t["download"],
+					})
+				}
+
+				if len(logs) > 0 {
+					trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
+					if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
+						_ = os.WriteFile(trafficReportFile, reportData, 0644)
+					}
+
+					log.Printf("[TRAFFIC REPORT] Đang gửi dữ liệu sử dụng của %d user lên web", len(logs))
+
+					if apiErr := sendApiRequest("report_traffic", map[string]interface{}{"logs": logs}, nil); apiErr != nil {
+						log.Printf("[TRAFFIC API LỖI] Không thể gửi dữ liệu lên web: %v", apiErr)
+					} else {
+						log.Printf("[TRAFFIC API THÀNH CÔNG] Đã đẩy dữ liệu lưu lượng lên web.")
+					}
+				} else {
+					log.Printf("[TRAFFIC REPORT] Không tìm thấy lưu lượng user nào trong dữ liệu từ grpcurl.")
 				}
 			}
 		}()
