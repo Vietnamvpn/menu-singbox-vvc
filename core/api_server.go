@@ -27,16 +27,15 @@ var (
 	entryNodeFile = filepath.Join(DataDir, "entry-node.json")
 	apiConfigFile = filepath.Join(DataDir, "api_config.json")
 	fileMutex     sync.Mutex
+	reloadMutex   sync.Mutex
 )
 
-// Cấu hình API Web trung tâm đọc từ tệp hệ thống
 type ApiConfig struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
 	Port  int    `json:"port"`
 }
 
-// Cấu trúc User chuẩn
 type User struct {
 	Username string `json:"username"`
 	Tag      string `json:"tag"`
@@ -44,7 +43,6 @@ type User struct {
 	Status   string `json:"status,omitempty"`
 }
 
-// Cấu trúc Node đầy đủ để ghép link chuẩn theo utils.sh
 type Node struct {
 	Type        string `json:"type"`
 	Tag         string `json:"tag"`
@@ -59,19 +57,16 @@ type Node struct {
 	Password    string `json:"password"`
 }
 
-// Request từ Web trung tâm gửi sang để reset
 type ResetRequest struct {
 	Username string `json:"username"`
 }
 
-// Response trả về Web trung tâm
 type ResetResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 	NewLink string `json:"new_link,omitempty"`
 }
 
-// Cấu trúc Task nhận từ Web trung tâm qua action get_tasks
 type Task struct {
 	ID      interface{}     `json:"id"`
 	Action  string          `json:"action"`
@@ -83,59 +78,20 @@ type TasksResponse struct {
 	Tasks  []Task `json:"tasks"`
 }
 
-// Cấu trúc Entry Node để thay thế IP/Port nếu có
 type EntryNode struct {
 	Tag    string `json:"tag"`
 	Domain string `json:"domain"`
 	Port   int    `json:"port"`
 }
 
-// Struct giúp tự động làm mới file log khi vượt quá kích thước (Tránh rác)
-type sizeRotationWriter struct {
-	logFile string
-	maxSize int64
-	file    *os.File
-	mu      sync.Mutex
-}
-
-func (w *sizeRotationWriter) Write(p []byte) (n int, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if w.file == nil {
-		f, err := os.OpenFile(w.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			return os.Stdout.Write(p) // Fallback in ra console nếu lỗi
-		}
-		w.file = f
-	}
-
-	info, err := w.file.Stat()
-	// Giới hạn file tối đa (vd: 1MB = 1048576 bytes), vượt quá sẽ xóa trắng ghi lại từ đầu
-	if err == nil && info.Size()+int64(len(p)) > w.maxSize {
-		w.file.Close()
-		w.file, _ = os.OpenFile(w.logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
-	}
-
-	return w.file.Write(p)
-}
-
 func main() {
 	os.MkdirAll(DataDir, 0755)
 	os.MkdirAll(LogDir, 0755)
 
-	// Cấu hình ghi log ra file tập trung với cơ chế chống rác (Giới hạn 1MB)
-	logFilePath := filepath.Join(LogDir, "api_server.log")
-	logger := &sizeRotationWriter{
-		logFile: logFilePath,
-		maxSize: 1048576, // 1MB
-	}
-	log.SetOutput(logger)
+	// Đã loại bỏ sizeRotationWriter và api_server.log, log in ra console chuẩn
 
-	// Chạy tiến trình đồng bộ tổng hợp với node_sync.php
 	go systemSyncRoutine()
 
-	// Mở HTTP API Server chờ lệnh tức thời từ Web trung tâm
 	http.HandleFunc("/api/reset-password", handleResetPassword)
 
 	log.Printf("Sing-box Manager API Server đang chạy tại port %s", ListenAddr)
@@ -144,7 +100,6 @@ func main() {
 	}
 }
 
-// Đọc cấu hình API động từ tệp cấu hình của hệ thống
 func getApiConfig() (string, string, int) {
 	data, err := os.ReadFile(apiConfigFile)
 	if err != nil {
@@ -157,7 +112,6 @@ func getApiConfig() (string, string, int) {
 	return config.URL, config.Token, config.Port
 }
 
-// Helper gửi request POST chung đến node_sync.php
 func sendApiRequest(action string, payload map[string]interface{}, result interface{}) error {
 	baseURL, token, port := getApiConfig()
 	if baseURL == "" || token == "" {
@@ -170,7 +124,6 @@ func sendApiRequest(action string, payload map[string]interface{}, result interf
 		return err
 	}
 
-	// Ghi log toàn bộ payload JSON chuẩn bị gửi lên Web trung tâm
 	log.Printf("[API GỬI ĐI] Action: %s | Payload: %s", action, string(jsonBody))
 
 	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonBody))
@@ -199,7 +152,6 @@ func sendApiRequest(action string, payload map[string]interface{}, result interf
 	return nil
 }
 
-// Xử lý yêu cầu reset từ web trung tâm
 func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -220,10 +172,9 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileMutex.Lock()
-	defer fileMutex.Unlock()
-
 	users, err := readUsers()
 	if err != nil {
+		fileMutex.Unlock()
 		sendJSONResponse(w, "error", "Lỗi đọc dữ liệu users", "")
 		return
 	}
@@ -238,14 +189,17 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if foundUser == nil {
+		fileMutex.Unlock()
 		sendJSONResponse(w, "error", "Không tìm thấy User", "")
 		return
 	}
 
 	if err := writeUsers(users); err != nil {
+		fileMutex.Unlock()
 		sendJSONResponse(w, "error", "Lỗi ghi dữ liệu mới", "")
 		return
 	}
+	fileMutex.Unlock()
 
 	newLink := generateProxyLink(*foundUser)
 	go reloadSingbox()
@@ -277,16 +231,30 @@ func systemSyncRoutine() {
 
 		func() {
 			var taskResp TasksResponse
-			err := sendApiRequest("get_tasks", map[string]interface{}{}, &taskResp)
+			err := sendApiRequest("get_tasks", map[string]interface{}, &taskResp)
 			if err == nil && len(taskResp.Tasks) > 0 {
+				needReload := false
 				for _, task := range taskResp.Tasks {
-					executeTask(task)
+					changed := executeTask(task)
+					if changed {
+						needReload = true
+					}
+				}
+				if needReload {
+					go reloadSingbox()
 				}
 			}
 		}()
 
 		func() {
 			logs := []map[string]interface{}{}
+
+			// Lưu danh sách traffic report vào traffic_report.json trước khi gửi đi
+			trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
+			if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
+				_ = os.WriteFile(trafficReportFile, reportData, 0644)
+			}
+
 			_ = sendApiRequest("report_traffic", map[string]interface{}{
 				"logs": logs,
 			}, nil)
@@ -294,18 +262,15 @@ func systemSyncRoutine() {
 	}
 }
 
-// Thực thi các lệnh task nhận từ web
-func executeTask(task Task) {
+func executeTask(task Task) bool {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 
-	// Chuyển file hứng JSON thô sang thư mục logs
 	debugFile := filepath.Join(LogDir, "debug_task.json")
 	if debugData, err := json.MarshalIndent(task, "", "  "); err == nil {
 		_ = os.WriteFile(debugFile, debugData, 0644)
 	}
 
-	// Ghi luôn vào file log chung để dễ theo dõi realtime
 	log.Printf("[API NHẬN VỀ] Task ID: %v | Action: %s | Payload: %s", task.ID, task.Action, string(task.Payload))
 
 	var payload map[string]interface{}
@@ -325,6 +290,7 @@ func executeTask(task Task) {
 
 	var taskStatus = "done"
 	var errorMsg *string
+	needReload := false
 
 	switch actionType {
 	case "add_user", "create_user", "reset_token":
@@ -357,7 +323,7 @@ func executeTask(task Task) {
 			}
 			if err := writeUsers(users); err == nil {
 				log.Printf("[TASK] Đã thêm/cập nhật user từ web: %s", username)
-				go reloadSingbox()
+				needReload = true
 			} else {
 				errMsg := err.Error()
 				errorMsg = &errMsg
@@ -386,7 +352,7 @@ func executeTask(task Task) {
 				if found {
 					if err := writeUsers(newUsers); err == nil {
 						log.Printf("[TASK] Đã xóa user từ web: %s", username)
-						go reloadSingbox()
+						needReload = true
 					} else {
 						errMsg := err.Error()
 						errorMsg = &errMsg
@@ -413,7 +379,7 @@ func executeTask(task Task) {
 			}
 			if updated {
 				if err := writeUsers(users); err == nil {
-					go reloadSingbox()
+					needReload = true
 				} else {
 					errMsg := err.Error()
 					errorMsg = &errMsg
@@ -436,12 +402,13 @@ func executeTask(task Task) {
 		log.Printf("[TASK] Hành động không hỗ trợ: %v", actionType)
 	}
 
-	// Báo cáo kết quả task về node_sync.php
 	_ = sendApiRequest("update_task_status", map[string]interface{}{
 		"task_id":     task.ID,
 		"task_status": taskStatus,
 		"error_msg":   errorMsg,
 	}, nil)
+
+	return needReload
 }
 
 func sendJSONResponse(w http.ResponseWriter, status, message, link string) {
@@ -489,7 +456,6 @@ func getEntryNodeInfo(tag string) (string, int) {
 	return "", 0
 }
 
-// Sinh link chi tiết cho từng Node theo đúng công thức trong modules/utils.sh
 func generateLinkForNode(u User, n Node) string {
 	entryDomain, entryPort := getEntryNodeInfo(n.Tag)
 
@@ -543,7 +509,6 @@ func generateLinkForNode(u User, n Node) string {
 	}
 }
 
-// Tổng hợp danh sách link cho user dựa trên nodes.json
 func generateProxyLink(u User) string {
 	data, err := os.ReadFile(nodesFile)
 	if err == nil {
@@ -561,7 +526,6 @@ func generateProxyLink(u User) string {
 		}
 	}
 
-	// Fallback nếu chưa có node nào trong nodes.json
 	entryDomain, entryPort := getEntryNodeInfo(u.Tag)
 	if entryDomain == "" {
 		entryDomain = "VPS_IP_OR_DOMAIN"
@@ -574,6 +538,9 @@ func generateProxyLink(u User) string {
 }
 
 func reloadSingbox() {
+	reloadMutex.Lock()
+	defer reloadMutex.Unlock()
+
 	cmd := exec.Command("bash", "-c", "source /opt/menu-singbox-vvc/modules/utils.sh && build_and_apply_config")
 	if err := cmd.Run(); err != nil {
 		log.Printf("Lỗi khi tải lại sing-box: %v", err)
