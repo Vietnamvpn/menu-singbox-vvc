@@ -408,7 +408,7 @@ extract_json_block() {
 # ==========================================
 
 build_and_apply_config() {
-    local base_file="${1:-${INSTALL_DIR}/data/config.json}"
+    local base_file="${1:-${INSTALL_DIR}/templates/config.base.json}"
     local output_file="${2:-/etc/sing-box/config.json}"
     local data_dir="${DATA_DIR:-${INSTALL_DIR}/data}"
     
