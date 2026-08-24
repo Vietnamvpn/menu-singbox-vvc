@@ -301,18 +301,20 @@ func systemSyncRoutine() {
 							"download": t["download"],
 						})
 					}
+
+					// Chỉ ghi file traffic_report.json và gửi API khi thực sự có dữ liệu lưu lượng
+					if len(logs) > 0 {
+						trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
+						if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
+							_ = os.WriteFile(trafficReportFile, reportData, 0644)
+						}
+
+						_ = sendApiRequest("report_traffic", map[string]interface{}{
+							"logs": logs,
+						}, nil)
+					}
 				}
 			}
-
-			// Lưu danh sách traffic report vào traffic_report.json
-			trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
-			if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
-				_ = os.WriteFile(trafficReportFile, reportData, 0644)
-			}
-
-			_ = sendApiRequest("report_traffic", map[string]interface{}{
-				"logs": logs,
-			}, nil)
 		}()
 	}
 }
