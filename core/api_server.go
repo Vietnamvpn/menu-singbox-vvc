@@ -86,8 +86,8 @@ type EntryNode struct {
 }
 
 type SingboxStat struct {
-	Name  string `json:"name"`
-	Value int64  `json:"value"`
+	Name  string      `json:"name"`
+	Value interface{} `json:"value"`
 }
 
 type SingboxStatsResponse struct {
@@ -303,14 +303,17 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 						username := parts[1]
 						trafficType := parts[3]
 
+						var valInt int64
+						_, _ = fmt.Sscanf(fmt.Sprintf("%v", s.Value), "%d", &valInt)
+
 						if _, exists := userTraffic[username]; !exists {
 							userTraffic[username] = map[string]int64{"upload": 0, "download": 0}
 						}
 
 						if trafficType == "uplink" || trafficType == "up" {
-							userTraffic[username]["upload"] += s.Value
+							userTraffic[username]["upload"] += valInt
 						} else if trafficType == "downlink" || trafficType == "down" {
-							userTraffic[username]["download"] += s.Value
+							userTraffic[username]["download"] += valInt
 						}
 					}
 				}
