@@ -231,7 +231,7 @@ func systemSyncRoutine() {
 
 		func() {
 			var taskResp TasksResponse
-			err := sendApiRequest("get_tasks", map[string]interface{}, &taskResp)
+			err := sendApiRequest("get_tasks", map[string]interface{}{}, &taskResp)
 			if err == nil && len(taskResp.Tasks) > 0 {
 				needReload := false
 				for _, task := range taskResp.Tasks {
