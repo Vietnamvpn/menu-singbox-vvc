@@ -353,6 +353,7 @@ func executeTask(task Task) bool {
 	case "add_user", "create_user", "reset_token":
 		username, _ := payload["username"].(string)
 		uuid, _ := payload["uuid"].(string)
+		status, _ := payload["status"].(string)
 
 		if username != "" && uuid != "" {
 			users, err := readUsers()
@@ -363,7 +364,9 @@ func executeTask(task Task) bool {
 			for i, u := range users {
 				if u.Username == username {
 					users[i].Secret = uuid
-					users[i].Status = ""
+					if status != "" {
+						users[i].Status = status
+					}
 					if users[i].Tag == "" {
 						users[i].Tag = "all"
 					}
@@ -372,14 +375,18 @@ func executeTask(task Task) bool {
 				}
 			}
 			if !exists {
+				if status == "" {
+					status = "active"
+				}
 				users = append(users, User{
 					Username: username,
 					Tag:      "all",
 					Secret:   uuid,
+					Status:   status,
 				})
 			}
 			if err := writeUsers(users); err == nil {
-				log.Printf("[TASK] Đã thêm/cập nhật user từ web: %s", username)
+				log.Printf("[TASK] Đã thêm/cập nhật user từ web: %s (Status: %s)", username, status)
 				needReload = true
 			} else {
 				errMsg := err.Error()
