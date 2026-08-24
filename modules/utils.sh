@@ -427,7 +427,7 @@ build_and_apply_config() {
     local temp_output="/tmp/singbox_config_temp.json"
     local routing_file="$data_dir/routing.json"
     
-    # Đọc dữ liệu node, lọc user đang hoạt động và dựng cấu hình JSON
+    # Đọc dữ liệu node, lọc user đang hoạt động và dựng cấu hình JSON khớp với các loại node thực tế
     jq --argjson nodes "$(cat "$data_dir/nodes.json")" \
        --argjson users "$(cat "$data_dir/users.json")" \
        --argjson routings "$([ -f "$routing_file" ] && cat "$routing_file" || echo "[]")" \
@@ -436,10 +436,9 @@ build_and_apply_config() {
        .inbounds = (
          $nodes | map(
            . as $n |
-           # Chỉ lấy các user có status == "active" (hoặc rỗng) và khớp tag
            ($users | map(select((.status == "active" or .status == null or .status == "") and (.tag == $n.tag or .tag == "all")))) as $matched_users |
            
-           if $n.type == "vless" then
+           if ($n.type | startswith("vless")) then
              {
                type: "vless",
                tag: $n.tag,
@@ -450,45 +449,42 @@ build_and_apply_config() {
                users: ($matched_users | map({
                  name: .username,
                  uuid: .uuid,
-                 flow: (if $n.network == "tcp" and ($n.tls == "reality" or $n.tls == "tls") then (.flow // "") else "" end)
+                 flow: (if $n.type == "vless-reality" then "xtls-rprx-vision" else "" end)
                })),
                tls: (
-                 if $n.tls == "reality" then
+                 if $n.type == "vless-reality" or $n.type == "vless-grpc-reality" then
                    {
                      enabled: true,
-                     server_name: $n.sni,
+                     server_name: ($n.sni // $n.domain // "localhost"),
                      reality: {
                        enabled: true,
                        handshake: {
-                         server: $n.sni,
-                         server_port: (if $n.target_port then ($n.target_port | tonumber) else 443 end)
+                         server: ($n.sni // $n.domain // "localhost"),
+                         server_port: 443
                        },
-                       private_key: $n.private_key,
+                       private_key: ($n.public_key // ""),
                        short_id: (if ($n.short_id != null and $n.short_id != "") then [$n.short_id] else [] end)
                      }
                    }
-                 elif $n.tls == "tls" then
+                 elif $n.type == "vless-ws-tls" then
                    {
                      enabled: true,
-                     server_name: $n.sni,
-                     certificate_path: $n.cert_path,
-                     key_path: $n.key_path
+                     server_name: ($n.sni // $n.domain // "localhost")
                    }
                  else
                    null
                  end
                ),
                transport: (
-                 if $n.network == "ws" then
-                   {
-                     type: "ws",
-                     path: $n.path,
-                     headers: (if $n.host != "" and $n.host != null then {Host: $n.host} else {} end)
-                   }
-                 elif $n.network == "grpc" then
+                 if $n.type == "vless-grpc-reality" then
                    {
                      type: "grpc",
-                     service_name: $n.service_name
+                     service_name: ($n.grpc_service // "")
+                   }
+                 elif $n.type == "vless-ws-tls" then
+                   {
+                     type: "ws",
+                     path: ($n.ws_path // "/")
                    }
                  else
                    null
@@ -501,17 +497,13 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               up_mbps: (if ($n.up_mbps != null and $n.up_mbps != "") then ($n.up_mbps | tonumber) else 100 end),
-               down_mbps: (if ($n.down_mbps != null and $n.down_mbps != "") then ($n.down_mbps | tonumber) else 100 end),
                users: ($matched_users | map({
                  name: .username,
                  password: (.password // .uuid)
                })),
                tls: {
                  enabled: true,
-                 server_name: $n.sni,
-                 certificate_path: $n.cert_path,
-                 key_path: $n.key_path
+                 server_name: ($n.sni // $n.domain // "localhost")
                }
              }
            elif $n.type == "tuic" then
@@ -526,12 +518,9 @@ build_and_apply_config() {
                  password: (.password // .uuid)
                })),
                congestion_control: "bbr",
-               zero_rtt_handshake: true,
                tls: {
                  enabled: true,
-                 server_name: $n.sni,
-                 certificate_path: $n.cert_path,
-                 key_path: $n.key_path
+                 server_name: ($n.sni // $n.domain // "localhost")
                }
              }
            else
@@ -539,7 +528,6 @@ build_and_apply_config() {
            end
          )
        ) |
-       # Nối quy tắc routing an toàn
        if ($routings | length) > 0 then
          .route.rules = ((.route.rules // []) + $routings)
        else
@@ -553,9 +541,12 @@ build_and_apply_config() {
         return 1
     fi
 
-    # Kiểm tra tính hợp lệ bằng sing-box check
-    if ! sing-box check -c "$temp_output" > /dev/null 2>&1; then
-        log_error "Cấu hình Sing-box tạo ra không hợp lệ (kiểm tra bằng sing-box check thất bại)"
+    # Kiểm tra tính hợp lệ và hiển thị lỗi cụ thể nếu sing-box check thất bại
+    local check_output
+    if ! check_output=$(sing-box check -c "$temp_output" 2>&1); then
+        echo -e "\033[0;31m[CHI TIẾT LỖI SING-BOX CHECK]:\033[0m"
+        echo "$check_output"
+        log_error "Cấu hình Sing-box tạo ra không hợp lệ"
         rm -f "$temp_output"
         return 1
     fi
@@ -563,7 +554,6 @@ build_and_apply_config() {
     mv "$temp_output" "$output_file"
     log_info "Đã cập nhật file cấu hình Sing-box thành công tại: $output_file"
     
-    # Reload hoặc Restart Sing-box
     if systemctl is-active --quiet sing-box; then
         log_info "Đang reload dịch vụ Sing-box..."
         systemctl reload sing-box || systemctl restart sing-box
