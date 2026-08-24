@@ -443,7 +443,7 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               users: ($matched_users | map({uuid: .uuid})),
+               users: ($matched_users | map({name: (.username // .Username), uuid: (.uuid // .UUID)})),
                tls: {
                  enabled: true,
                  server_name: $n.sni,
@@ -468,7 +468,7 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               users: ($matched_users | map({uuid: .uuid})),
+               users: ($matched_users | map({name: (.username // .Username), uuid: (.uuid // .UUID)})),
                tls: {
                  enabled: true,
                  server_name: ($n.domain // $n.sni // "160.250.180.35"),
@@ -486,7 +486,7 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               users: ($matched_users | map({password: .uuid})),
+               users: ($matched_users | map({name: (.username // .Username), password: (.uuid // .UUID)})),
                up_mbps: 100,
                down_mbps: 100,
                tls: {
@@ -501,7 +501,7 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               users: ($matched_users | map({uuid: .uuid, password: ($n.password // "0TnownUlPQZdJWrc")})),
+               users: ($matched_users | map({name: (.username // .Username), uuid: (.uuid // .UUID), password: ($n.password // "0TnownUlPQZdJWrc")})),
                tls: {
                  enabled: true,
                  server_name: ($n.domain // $n.sni // "160.250.180.35"),
@@ -516,7 +516,7 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               users: ($matched_users | map({uuid: .uuid, flow: "xtls-rprx-vision"})),
+               users: ($matched_users | map({name: (.username // .Username), uuid: (.uuid // .UUID), flow: "xtls-rprx-vision"})),
                tls: {
                  enabled: true,
                  server_name: $n.sni,
