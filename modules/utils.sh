@@ -460,7 +460,7 @@ build_and_apply_config() {
                         tag: $n.tag,
                         listen: "::",
                         listen_port: $n.port,
-                        users: ([$matched_users[] | {uuid: .secret, flow: "xtls-rprx-vision"}]),
+                        users: ([$matched_users[] | {name: .username, uuid: .secret, flow: "xtls-rprx-vision"}]),
                         tls: {
                             enabled: true,
                             server_name: $n.sni,
@@ -481,7 +481,7 @@ build_and_apply_config() {
                         tag: $n.tag,
                         listen: "::",
                         listen_port: $n.port,
-                        users: ([$matched_users[] | {uuid: .secret}]),
+                        users: ([$matched_users[] | {name: .username, uuid: .secret}]),
                         tls: {
                             enabled: true,
                             server_name: $n.domain,
@@ -499,7 +499,7 @@ build_and_apply_config() {
                         tag: $n.tag,
                         listen: "::",
                         listen_port: $n.port,
-                        users: ([$matched_users[] | {uuid: .secret}]),
+                        users: ([$matched_users[] | {name: .username, uuid: .secret}]),
                         tls: {
                             enabled: true,
                             server_name: $n.sni,
@@ -524,7 +524,7 @@ build_and_apply_config() {
                         tag: $n.tag,
                         listen: "::",
                         listen_port: $n.port,
-                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {password: .secret}] else [{password: $n.password}] end),
+                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {name: .username, password: .secret}] else [{password: $n.password}] end),
                         up_mbps: ($n.up_mbps | tonumber),
                         down_mbps: ($n.down_mbps | tonumber),
                         tls: {
@@ -539,7 +539,7 @@ build_and_apply_config() {
                         tag: $n.tag,
                         listen: "::",
                         listen_port: $n.port,
-                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {uuid: .secret, password: $n.password}] else [{uuid: $n.uuid, password: $n.password}] end),
+                        users: (if ($matched_users | length) > 0 then [$matched_users[] | {name: .username, uuid: .secret, password: $n.password}] else [{uuid: $n.uuid, password: $n.password}] end),
                         tls: {
                             enabled: true,
                             server_name: $n.domain,

@@ -217,6 +217,12 @@ func handleResetPassword(w http.ResponseWriter, r *http.Request) {
 
 // TIẾN TRÌNH ĐỒNG BỘ TỔNG HỢP VỚI node_sync.php
 func systemSyncRoutine() {
+	// Cài đặt grpcurl nếu VPS chưa có sẵn (chỉ kiểm tra 1 lần khi khởi chạy tiến trình)
+	if _, err := exec.LookPath("grpcurl"); err != nil {
+		_ = exec.Command("apt-get", "update", "-y").Run()
+		_ = exec.Command("apt-get", "install", "-y", "grpcurl").Run()
+	}
+
 	ticker := time.NewTicker(1 * time.Minute)
 	for range ticker.C {
 		baseURL, token, _ := getApiConfig()
@@ -256,12 +262,6 @@ func systemSyncRoutine() {
 
 		func() {
 			logs := []map[string]interface{}{}
-
-			// Cài đặt grpcurl nếu VPS chưa có sẵn
-			if _, err := exec.LookPath("grpcurl"); err != nil {
-				_ = exec.Command("apt-get", "update", "-y").Run()
-				_ = exec.Command("apt-get", "install", "-y", "grpcurl").Run()
-			}
 
 			// Truy vấn StatsService của Sing-box qua cổng 10085
 			cmd := exec.Command("grpcurl", "-plaintext", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
