@@ -455,7 +455,7 @@ build_and_apply_config() {
                      server: $n.sni,
                      server_port: 443
                    },
-                   private_key: $n.public_key,
+                   private_key: $n.private_key,
                    short_id: [$n.short_id]
                  }
                },
@@ -528,7 +528,7 @@ build_and_apply_config() {
                      server: $n.sni,
                      server_port: 443
                    },
-                   private_key: $n.public_key,
+                   private_key: $n.private_key,
                    short_id: [$n.short_id]
                  }
                }
