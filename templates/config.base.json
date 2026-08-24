@@ -51,7 +51,6 @@
       "stats": {
         "enabled": true,
         "inbounds": ["*"],
-        "outbounds": ["*"],
         "users": ["*"]
       }
     }
