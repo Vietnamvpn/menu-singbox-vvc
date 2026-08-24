@@ -427,7 +427,6 @@ build_and_apply_config() {
     local temp_output="/tmp/singbox_config_temp.json"
     local routing_file="$data_dir/routing.json"
     
-    # Đọc dữ liệu node, lọc user đang hoạt động và dựng cấu hình JSON khớp với các loại node thực tế
     jq --argjson nodes "$(cat "$data_dir/nodes.json")" \
        --argjson users "$(cat "$data_dir/users.json")" \
        --argjson routings "$([ -f "$routing_file" ] && cat "$routing_file" || echo "[]")" \
@@ -438,58 +437,48 @@ build_and_apply_config() {
            . as $n |
            ($users | map(select((.status == "active" or .status == null or .status == "") and (.tag == $n.tag or .tag == "all")))) as $matched_users |
            
-           if ($n.type | startswith("vless")) then
+           if $n.type == "vless-grpc-reality" then
              {
                type: "vless",
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               sniff: true,
-               sniff_override_destination: true,
-               users: ($matched_users | map({
-                 name: .username,
-                 uuid: .uuid,
-                 flow: (if $n.type == "vless-reality" then "xtls-rprx-vision" else "" end)
-               })),
-               tls: (
-                 if $n.type == "vless-reality" or $n.type == "vless-grpc-reality" then
-                   {
-                     enabled: true,
-                     server_name: ($n.sni // $n.domain // "localhost"),
-                     reality: {
-                       enabled: true,
-                       handshake: {
-                         server: ($n.sni // $n.domain // "localhost"),
-                         server_port: 443
-                       },
-                       private_key: ($n.public_key // ""),
-                       short_id: (if ($n.short_id != null and $n.short_id != "") then [$n.short_id] else [] end)
-                     }
-                   }
-                 elif $n.type == "vless-ws-tls" then
-                   {
-                     enabled: true,
-                     server_name: ($n.sni // $n.domain // "localhost")
-                   }
-                 else
-                   null
-                 end
-               ),
-               transport: (
-                 if $n.type == "vless-grpc-reality" then
-                   {
-                     type: "grpc",
-                     service_name: ($n.grpc_service // "")
-                   }
-                 elif $n.type == "vless-ws-tls" then
-                   {
-                     type: "ws",
-                     path: ($n.ws_path // "/")
-                   }
-                 else
-                   null
-                 end
-               )
+               users: ($matched_users | map({uuid: .uuid})),
+               tls: {
+                 enabled: true,
+                 server_name: $n.sni,
+                 reality: {
+                   enabled: true,
+                   handshake: {
+                     server: $n.sni,
+                     server_port: 443
+                   },
+                   private_key: $n.public_key,
+                   short_id: [$n.short_id]
+                 }
+               },
+               transport: {
+                 type: "grpc",
+                 service_name: $n.grpc_service
+               }
+             }
+           elif $n.type == "vless-ws-tls" then
+             {
+               type: "vless",
+               tag: $n.tag,
+               listen: "::",
+               listen_port: ($n.port | tonumber),
+               users: ($matched_users | map({uuid: .uuid})),
+               tls: {
+                 enabled: true,
+                 server_name: ($n.domain // $n.sni // "160.250.180.35"),
+                 certificate_path: ($n.cert_path // "/opt/menu-singbox-vvc/certs/default/cert.pem"),
+                 key_path: ($n.key_path // "/opt/menu-singbox-vvc/certs/default/private.key")
+               },
+               transport: {
+                 type: "ws",
+                 path: $n.ws_path
+               }
              }
            elif $n.type == "hysteria2" then
              {
@@ -497,13 +486,13 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               users: ($matched_users | map({
-                 name: .username,
-                 password: (.password // .uuid)
-               })),
+               users: ($matched_users | map({password: .uuid})),
+               up_mbps: 100,
+               down_mbps: 100,
                tls: {
                  enabled: true,
-                 server_name: ($n.sni // $n.domain // "localhost")
+                 certificate_path: ($n.cert_path // "/opt/menu-singbox-vvc/certs/default/cert.pem"),
+                 key_path: ($n.key_path // "/opt/menu-singbox-vvc/certs/default/private.key")
                }
              }
            elif $n.type == "tuic" then
@@ -512,15 +501,34 @@ build_and_apply_config() {
                tag: $n.tag,
                listen: "::",
                listen_port: ($n.port | tonumber),
-               users: ($matched_users | map({
-                 name: .username,
-                 uuid: .uuid,
-                 password: (.password // .uuid)
-               })),
-               congestion_control: "bbr",
+               users: ($matched_users | map({uuid: .uuid, password: ($n.password // "0TnownUlPQZdJWrc")})),
                tls: {
                  enabled: true,
-                 server_name: ($n.sni // $n.domain // "localhost")
+                 server_name: ($n.domain // $n.sni // "160.250.180.35"),
+                 alpn: ["h3"],
+                 certificate_path: ($n.cert_path // "/opt/menu-singbox-vvc/certs/default/cert.pem"),
+                 key_path: ($n.key_path // "/opt/menu-singbox-vvc/certs/default/private.key")
+               }
+             }
+           elif $n.type == "vless-reality" then
+             {
+               type: "vless",
+               tag: $n.tag,
+               listen: "::",
+               listen_port: ($n.port | tonumber),
+               users: ($matched_users | map({uuid: .uuid, flow: "xtls-rprx-vision"})),
+               tls: {
+                 enabled: true,
+                 server_name: $n.sni,
+                 reality: {
+                   enabled: true,
+                   handshake: {
+                     server: $n.sni,
+                     server_port: 443
+                   },
+                   private_key: $n.public_key,
+                   short_id: [$n.short_id]
+                 }
                }
              }
            else
@@ -541,7 +549,6 @@ build_and_apply_config() {
         return 1
     fi
 
-    # Kiểm tra tính hợp lệ và hiển thị lỗi cụ thể nếu sing-box check thất bại
     local check_output
     if ! check_output=$(sing-box check -c "$temp_output" 2>&1); then
         echo -e "\033[0;31m[CHI TIẾT LỖI SING-BOX CHECK]:\033[0m"
