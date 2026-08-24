@@ -268,7 +268,7 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 		func() {
 			logs := []map[string]interface{}{}
 
-			cmd := exec.Command("grpcurl", "-plaintext", "-proto", "/tmp/stats.proto", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
+			cmd := exec.Command("grpcurl", "-plaintext", "-import-path", "/tmp", "-proto", "/tmp/stats.proto", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
 			output, err := cmd.Output()
 			if err == nil && len(output) > 0 {
 				var statsResp SingboxStatsResponse
