@@ -84,11 +84,19 @@ type EntryNode struct {
 	Port   int    `json:"port"`
 }
 
+type SingboxStat struct {
+	Name  string `json:"name"`
+	Value int64  `json:"value"`
+}
+
+type SingboxStatsResponse struct {
+	Stat  []SingboxStat `json:"stat"`
+	Stats []SingboxStat `json:"stats"`
+}
+
 func main() {
 	os.MkdirAll(DataDir, 0755)
 	os.MkdirAll(LogDir, 0755)
-
-	// Đã loại bỏ sizeRotationWriter và api_server.log, log in ra console chuẩn
 
 	go systemSyncRoutine()
 
@@ -249,18 +257,44 @@ func systemSyncRoutine() {
 		func() {
 			logs := []map[string]interface{}{}
 
-			// Ví dụ: gọi lệnh truy vấn stats từ sing-box (nếu có command-line hỗ trợ) hoặc đọc từ module ngoài
-			// Nếu hệ thống dùng lệnh sing-box stats, ta có thể chạy qua exec.Command
-			cmd := exec.Command("sing-box", "stats", "-c", "/opt/menu-singbox-vvc/data/config.json") // Hoặc lệnh tương đương trong menu của bạn
-			if output, err := cmd.Output(); err == nil {
-				// Parse kết quả nếu tool trả về JSON, ví dụ:
-				_ = json.Unmarshal(output, &logs)
-			}
+			// Lấy dữ liệu thống kê từ gRPC v2ray_api của Sing-box tại port 10085
+			cmd := exec.Command("sing-box", "api", "stats", "query", "--server", "127.0.0.1:10085")
+			output, err := cmd.Output()
+			if err == nil && len(output) > 0 {
+				var res SingboxStatsResponse
+				if err := json.Unmarshal(output, &res); err == nil {
+					items := res.Stat
+					if len(items) == 0 {
+						items = res.Stats
+					}
 
-			// Nếu chưa có lệnh trực tiếp, ta có thể để trống hoặc đọc file log định dạng traffic nếu có.
-			// Đảm bảo logs luôn là slice map hợp lệ để ghi file và gửi đi.
-			if logs == nil {
-				logs = []map[string]interface{}{}
+					userTraffic := make(map[string]map[string]int64)
+					for _, item := range items {
+						parts := strings.Split(item.Name, ">>>")
+						if len(parts) >= 4 && parts[0] == "user" && parts[2] == "traffic" {
+							username := parts[1]
+							trafficType := parts[3]
+
+							if _, exists := userTraffic[username]; !exists {
+								userTraffic[username] = map[string]int64{"upload": 0, "download": 0}
+							}
+
+							if trafficType == "uplink" || trafficType == "up" {
+								userTraffic[username]["upload"] += item.Value
+							} else if trafficType == "downlink" || trafficType == "down" {
+								userTraffic[username]["download"] += item.Value
+							}
+						}
+					}
+
+					for u, t := range userTraffic {
+						logs = append(logs, map[string]interface{}{
+							"username": u,
+							"upload":   t["upload"],
+							"download": t["download"],
+						})
+					}
+				}
 			}
 
 			// Lưu danh sách traffic report vào traffic_report.json trước khi gửi đi
