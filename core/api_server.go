@@ -240,14 +240,65 @@ func systemSyncRoutine() {
 		}
 
 		func() {
-			var inbounds []map[string]interface{}
+			var nodes []Node
 			if data, err := os.ReadFile(nodesFile); err == nil {
-				json.Unmarshal(data, &inbounds)
+				_ = json.Unmarshal(data, &nodes)
 			}
-			if len(inbounds) > 0 {
+
+			var reportInbounds []map[string]interface{}
+			for _, n := range nodes {
+				entries := getMatchingEntryNodes(n.Tag)
+				if len(entries) > 0 {
+					for _, entry := range entries {
+						domain := entry.Address
+						if domain == "" {
+							domain = n.Domain
+						}
+						if domain == "" {
+							domain = n.Address
+						}
+						reportInbounds = append(reportInbounds, map[string]interface{}{
+							"type":         n.Type,
+							"tag":          n.Tag,
+							"domain":       domain,
+							"address":      entry.Address,
+							"port":         entry.Port,
+							"sni":          n.SNI,
+							"public_key":   n.PublicKey,
+							"short_id":     n.ShortID,
+							"ws_path":      n.WSPath,
+							"grpc_service": n.GRPCService,
+							"password":     n.Password,
+						})
+					}
+				} else {
+					domain := n.Domain
+					if domain == "" {
+						domain = n.Address
+					}
+					if domain == "" {
+						domain = "VPS_IP_OR_DOMAIN"
+					}
+					reportInbounds = append(reportInbounds, map[string]interface{}{
+						"type":         n.Type,
+						"tag":          n.Tag,
+						"domain":       domain,
+						"address":      n.Address,
+						"port":         n.Port,
+						"sni":          n.SNI,
+						"public_key":   n.PublicKey,
+						"short_id":     n.ShortID,
+						"ws_path":      n.WSPath,
+						"grpc_service": n.GRPCService,
+						"password":     n.Password,
+					})
+				}
+			}
+
+			if len(reportInbounds) > 0 {
 				var res map[string]interface{}
 				_ = sendApiRequest("report_inbounds", map[string]interface{}{
-					"inbounds": inbounds,
+					"inbounds": reportInbounds,
 				}, &res)
 			}
 		}()
