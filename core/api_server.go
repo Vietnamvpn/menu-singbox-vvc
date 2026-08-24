@@ -18,6 +18,7 @@ import (
 const (
 	ListenAddr = ":8080"
 	DataDir    = "/opt/menu-singbox-vvc/data"
+	LogDir     = "/opt/menu-singbox-vvc/logs"
 )
 
 var (
@@ -89,8 +90,47 @@ type EntryNode struct {
 	Port   int    `json:"port"`
 }
 
+// Struct giúp tự động làm mới file log khi vượt quá kích thước (Tránh rác)
+type sizeRotationWriter struct {
+	logFile string
+	maxSize int64
+	file    *os.File
+	mu      sync.Mutex
+}
+
+func (w *sizeRotationWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.file == nil {
+		f, err := os.OpenFile(w.logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			return os.Stdout.Write(p) // Fallback in ra console nếu lỗi
+		}
+		w.file = f
+	}
+
+	info, err := w.file.Stat()
+	// Giới hạn file tối đa (vd: 1MB = 1048576 bytes), vượt quá sẽ xóa trắng ghi lại từ đầu
+	if err == nil && info.Size()+int64(len(p)) > w.maxSize {
+		w.file.Close()
+		w.file, _ = os.OpenFile(w.logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+	}
+
+	return w.file.Write(p)
+}
+
 func main() {
 	os.MkdirAll(DataDir, 0755)
+	os.MkdirAll(LogDir, 0755)
+
+	// Cấu hình ghi log ra file tập trung với cơ chế chống rác (Giới hạn 1MB)
+	logFilePath := filepath.Join(LogDir, "api_server.log")
+	logger := &sizeRotationWriter{
+		logFile: logFilePath,
+		maxSize: 1048576, // 1MB
+	}
+	log.SetOutput(logger)
 
 	// Chạy tiến trình đồng bộ tổng hợp với node_sync.php
 	go systemSyncRoutine()
@@ -129,6 +169,9 @@ func sendApiRequest(action string, payload map[string]interface{}, result interf
 	if err != nil {
 		return err
 	}
+
+	// Ghi log toàn bộ payload JSON chuẩn bị gửi lên Web trung tâm
+	log.Printf("[API GỬI ĐI] Action: %s | Payload: %s", action, string(jsonBody))
 
 	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -256,10 +299,14 @@ func executeTask(task Task) {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 
-	debugFile := filepath.Join(DataDir, "debug_task.json")
+	// Chuyển file hứng JSON thô sang thư mục logs
+	debugFile := filepath.Join(LogDir, "debug_task.json")
 	if debugData, err := json.MarshalIndent(task, "", "  "); err == nil {
 		_ = os.WriteFile(debugFile, debugData, 0644)
 	}
+
+	// Ghi luôn vào file log chung để dễ theo dõi realtime
+	log.Printf("[API NHẬN VỀ] Task ID: %v | Action: %s | Payload: %s", task.ID, task.Action, string(task.Payload))
 
 	var payload map[string]interface{}
 	if len(task.Payload) > 0 {
