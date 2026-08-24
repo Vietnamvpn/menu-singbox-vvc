@@ -80,9 +80,9 @@ type TasksResponse struct {
 }
 
 type EntryNode struct {
-	Tag    string `json:"tag"`
-	Domain string `json:"domain"`
-	Port   int    `json:"port"`
+	NodeTag string `json:"node_tag"`
+	Address string `json:"address"`
+	Port    int    `json:"port"`
 }
 
 type SingboxStat struct {
@@ -512,72 +512,81 @@ func writeUsers(users []User) error {
 	return os.WriteFile(usersFile, data, 0644)
 }
 
-func getEntryNodeInfo(tag string) (string, int) {
+func getMatchingEntryNodes(tag string) []EntryNode {
+	var matched []EntryNode
 	data, err := os.ReadFile(entryNodeFile)
 	if err == nil {
 		var entries []EntryNode
 		if json.Unmarshal(data, &entries) == nil {
 			for _, e := range entries {
-				if e.Tag == tag {
-					return e.Domain, e.Port
+				if e.NodeTag == tag {
+					matched = append(matched, e)
 				}
 			}
 		}
 	}
-	return "", 0
+	return matched
 }
 
-func generateLinkForNode(u User, n Node) string {
-	entryDomain, entryPort := getEntryNodeInfo(n.Tag)
-
-	domain := entryDomain
-	if domain == "" {
-		if n.Domain != "" {
-			domain = n.Domain
-		} else if n.Address != "" {
-			domain = n.Address
-		} else {
-			domain = "VPS_IP_OR_DOMAIN"
-		}
-	}
-
-	port := entryPort
-	if port == 0 {
-		port = n.Port
-	}
-
+func buildLinkWithDetails(uuid, domain string, port int, n Node, tagLabel string) string {
 	sni := n.SNI
 	if sni == "" {
 		sni = domain
 	}
 
-	tagLabel := fmt.Sprintf("%s-%s", u.Username, n.Tag)
-
 	switch n.Type {
 	case "vless-reality":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&flow=xtls-rprx-vision&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&type=tcp#%s",
-			u.UUID, domain, port, sni, n.PublicKey, n.ShortID, tagLabel)
+			uuid, domain, port, sni, n.PublicKey, n.ShortID, tagLabel)
 
 	case "vless-grpc-reality":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&type=grpc&serviceName=%s#%s",
-			u.UUID, domain, port, sni, n.PublicKey, n.ShortID, n.GRPCService, tagLabel)
+			uuid, domain, port, sni, n.PublicKey, n.ShortID, n.GRPCService, tagLabel)
 
 	case "vless-ws-tls":
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=tls&sni=%s&type=ws&path=%s&allowInsecure=1#%s",
-			u.UUID, domain, port, sni, n.WSPath, tagLabel)
+			uuid, domain, port, sni, n.WSPath, tagLabel)
 
 	case "hysteria2":
 		return fmt.Sprintf("hysteria2://%s@%s:%d?sni=%s&insecure=1#%s",
-			u.UUID, domain, port, sni, tagLabel)
+			uuid, domain, port, sni, tagLabel)
 
 	case "tuic":
 		return fmt.Sprintf("tuic://%s:%s@%s:%d?congestion_control=bbr&sni=%s&alpn=h3&insecure=1#%s",
-			u.UUID, n.Password, domain, port, sni, tagLabel)
+			uuid, n.Password, domain, port, sni, tagLabel)
 
 	default:
 		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
-			u.UUID, domain, port, sni, tagLabel)
+			uuid, domain, port, sni, tagLabel)
 	}
+}
+
+func generateLinksForNode(u User, n Node) []string {
+	var links []string
+	tagLabel := fmt.Sprintf("%s-%s", u.Username, n.Tag)
+	entries := getMatchingEntryNodes(n.Tag)
+
+	if len(entries) > 0 {
+		for _, entry := range entries {
+			domain := entry.Address
+			port := entry.Port
+			if domain != "" && port > 0 {
+				links = append(links, buildLinkWithDetails(u.UUID, domain, port, n, tagLabel))
+			}
+		}
+	} else {
+		domain := n.Domain
+		if domain == "" {
+			domain = n.Address
+		}
+		if domain == "" {
+			domain = "VPS_IP_OR_DOMAIN"
+		}
+		port := n.Port
+		links = append(links, buildLinkWithDetails(u.UUID, domain, port, n, tagLabel))
+	}
+
+	return links
 }
 
 func generateProxyLink(u User) string {
@@ -585,27 +594,27 @@ func generateProxyLink(u User) string {
 	if err == nil {
 		var nodes []Node
 		if json.Unmarshal(data, &nodes) == nil && len(nodes) > 0 {
-			var links []string
+			var allLinks []string
 			for _, n := range nodes {
 				if u.Tag == "all" || u.Tag == "" || u.Tag == n.Tag {
-					links = append(links, generateLinkForNode(u, n))
+					allLinks = append(allLinks, generateLinksForNode(u, n)...)
 				}
 			}
-			if len(links) > 0 {
-				return strings.Join(links, "\n")
+			if len(allLinks) > 0 {
+				return strings.Join(allLinks, "\n")
 			}
 		}
 	}
 
-	entryDomain, entryPort := getEntryNodeInfo(u.Tag)
-	if entryDomain == "" {
-		entryDomain = "VPS_IP_OR_DOMAIN"
-	}
-	if entryPort == 0 {
-		entryPort = 443
+	entries := getMatchingEntryNodes(u.Tag)
+	domain := "VPS_IP_OR_DOMAIN"
+	port := 443
+	if len(entries) > 0 {
+		domain = entries[0].Address
+		port = entries[0].Port
 	}
 	return fmt.Sprintf("vless://%s@%s:%d?encryption=none&type=tcp&security=reality&sni=%s#%s",
-		u.UUID, entryDomain, entryPort, entryDomain, u.Username)
+		u.UUID, domain, port, domain, u.Username)
 }
 
 func reloadSingbox() {
