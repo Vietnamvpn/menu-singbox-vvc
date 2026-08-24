@@ -448,7 +448,7 @@ build_and_apply_config() {
                sniff: true,
                sniff_override_destination: true,
                users: ($matched_users | map({
-                 name: .email,
+                 name: .username,
                  uuid: .uuid,
                  flow: (if $n.network == "tcp" and ($n.tls == "reality" or $n.tls == "tls") then (.flow // "") else "" end)
                })),
@@ -504,7 +504,7 @@ build_and_apply_config() {
                up_mbps: (if ($n.up_mbps != null and $n.up_mbps != "") then ($n.up_mbps | tonumber) else 100 end),
                down_mbps: (if ($n.down_mbps != null and $n.down_mbps != "") then ($n.down_mbps | tonumber) else 100 end),
                users: ($matched_users | map({
-                 name: .email,
+                 name: .username,
                  password: (.password // .uuid)
                })),
                tls: {
@@ -521,7 +521,7 @@ build_and_apply_config() {
                listen: "::",
                listen_port: ($n.port | tonumber),
                users: ($matched_users | map({
-                 name: .email,
+                 name: .username,
                  uuid: .uuid,
                  password: (.password // .uuid)
                })),
