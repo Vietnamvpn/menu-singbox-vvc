@@ -426,10 +426,12 @@ build_and_apply_config() {
 
     local temp_output="/tmp/singbox_config_temp.json"
     local routing_file="$data_dir/routing.json"
+    local outbound_file="$data_dir/outbound.json"
     
     jq --argjson nodes "$(cat "$data_dir/nodes.json")" \
        --argjson users "$(cat "$data_dir/users.json")" \
        --argjson routings "$([ -f "$routing_file" ] && cat "$routing_file" || echo "[]")" \
+       --argjson outbounds "$([ -f "$outbound_file" ] && cat "$outbound_file" || echo "[]")" \
        '
        .inbounds = [] |
        .inbounds = (
@@ -536,6 +538,11 @@ build_and_apply_config() {
            end
          )
        ) |
+       if ($outbounds | length) > 0 then
+         .outbounds = ((.outbounds // []) + $outbounds)
+       else
+         .
+       end |
        if ($routings | length) > 0 then
          .route.rules = ((.route.rules // []) + $routings)
        else
