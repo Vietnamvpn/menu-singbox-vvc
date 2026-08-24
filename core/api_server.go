@@ -98,7 +98,7 @@ type SingboxStatsResponse struct {
 func main() {
 	os.MkdirAll(DataDir, 0755)
 	os.MkdirAll(LogDir, 0755)
-
+	//--------------------------
 	// Cấu hình ghi log ra đồng thời màn hình console và file server.log
 	logFile, err := os.OpenFile(filepath.Join(LogDir, "server.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
@@ -106,7 +106,7 @@ func main() {
 	} else {
 		log.Printf("Không thể mở file log hệ thống: %v", err)
 	}
-
+	//--------------------------
 	go systemSyncRoutine()
 
 	http.HandleFunc("/api/reset-password", handleResetPassword)
@@ -327,10 +327,13 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 				}
 
 				if len(logs) > 0 {
+					//---------------------------
+					// Lưu báo cáo lưu lượng vào file traffic_report.json
 					trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
 					if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
 						_ = os.WriteFile(trafficReportFile, reportData, 0644)
 					}
+					//---------------------------
 
 					log.Printf("[TRAFFIC REPORT] Đang gửi dữ liệu sử dụng của %d user lên web", len(logs))
 
@@ -350,12 +353,13 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 func executeTask(task Task) bool {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
-
+	//--------------------------
+	// Ghi debug task vào file debug_task.json để kiểm tra payload
 	debugFile := filepath.Join(LogDir, "debug_task.json")
 	if debugData, err := json.MarshalIndent(task, "", "  "); err == nil {
 		_ = os.WriteFile(debugFile, debugData, 0644)
 	}
-
+	//--------------------------
 	log.Printf("[API NHẬN VỀ] Task ID: %v | Action: %s | Payload: %s", task.ID, task.Action, string(task.Payload))
 
 	var payload map[string]interface{}
