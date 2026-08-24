@@ -183,6 +183,14 @@ send_manual_links() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
     echo -e "${YELLOW} GỬI THÔNG TIN / LINK NODE THỦ CÔNG${NC}"
     echo -e "${CYAN}--------------------------------------------------${NC}"
+    
+    # Kiểm tra trạng thái dịch vụ API Daemon (Manager)
+    if ! systemctl is-active --quiet manager; then
+        log_warn "Dịch vụ API Daemon (Manager) đang tắt! Vui lòng bật dịch vụ ở mục 2 trước khi gửi link."
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
     if [ ! -f "$API_CONFIG_FILE" ]; then
         log_warn "Chưa có cấu hình API nào được lưu."
         read -p "Nhấn Enter để tiếp tục..."
