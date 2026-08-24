@@ -257,20 +257,25 @@ func systemSyncRoutine() {
 		func() {
 			logs := []map[string]interface{}{}
 
-			// Lấy dữ liệu thống kê từ gRPC v2ray_api của Sing-box tại port 10085
+			// Lấy dữ liệu thống kê qua CLI gRPC của Sing-box
 			cmd := exec.Command("sing-box", "api", "stats", "query", "--server", "127.0.0.1:10085")
 			output, err := cmd.Output()
 			if err == nil && len(output) > 0 {
-				var res SingboxStatsResponse
-				if err := json.Unmarshal(output, &res); err == nil {
-					items := res.Stat
-					if len(items) == 0 {
-						items = res.Stats
+				lines := strings.Split(string(output), "\n")
+				userTraffic := make(map[string]map[string]int64)
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					if line == "" {
+						continue
 					}
 
-					userTraffic := make(map[string]map[string]int64)
-					for _, item := range items {
-						parts := strings.Split(item.Name, ">>>")
+					fields := strings.Fields(line)
+					if len(fields) >= 2 {
+						statName := strings.TrimSuffix(fields[0], ":")
+						var val int64
+						fmt.Sscanf(fields[1], "%d", &val)
+
+						parts := strings.Split(statName, ">>>")
 						if len(parts) >= 4 && parts[0] == "user" && parts[2] == "traffic" {
 							username := parts[1]
 							trafficType := parts[3]
@@ -280,21 +285,23 @@ func systemSyncRoutine() {
 							}
 
 							if trafficType == "uplink" || trafficType == "up" {
-								userTraffic[username]["upload"] += item.Value
+								userTraffic[username]["upload"] += val
 							} else if trafficType == "downlink" || trafficType == "down" {
-								userTraffic[username]["download"] += item.Value
+								userTraffic[username]["download"] += val
 							}
 						}
 					}
-
-					for u, t := range userTraffic {
-						logs = append(logs, map[string]interface{}{
-							"username": u,
-							"upload":   t["upload"],
-							"download": t["download"],
-						})
-					}
 				}
+
+				for u, t := range userTraffic {
+					logs = append(logs, map[string]interface{}{
+						"username": u,
+						"upload":   t["upload"],
+						"download": t["download"],
+					})
+				}
+			} else if err != nil {
+				log.Printf("[TRAFFIC ERROR] Lỗi truy vấn gRPC sing-box: %v", err)
 			}
 
 			// Lưu danh sách traffic report vào traffic_report.json trước khi gửi đi
