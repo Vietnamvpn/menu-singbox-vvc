@@ -29,7 +29,7 @@ list_users() {
         return 1
     else
         if command -v jq &> /dev/null; then
-            jq -r 'to_entries[] | "\(.key + 1). User: \(.value.username) │ Tag: \(.value.tag) │ Pass/UUID: \(.value.secret)"' "$USERS_FILE"
+            jq -r 'to_entries[] | "\(.key + 1). User: \(.value.username) │ Tag: \(.value.tag) │ UUID: \(.value.uuid) │ Status: \(.value.status // "active")"' "$USERS_FILE"
         else
             cat "$USERS_FILE"
         fi
@@ -40,7 +40,7 @@ list_users() {
 
 generate_node_links_with_entry() {
     local node="$1"
-    local secret="$2"
+    local uuid="$2"
     local default_server_ip="$3"
 
     local type=$(echo "$node" | jq -r '.type')
@@ -69,28 +69,28 @@ generate_node_links_with_entry() {
                     local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
                     local public_key=$(echo "$node" | jq -r '.public_key // empty')
                     local short_id=$(echo "$node" | jq -r '.short_id // empty')
-                    link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                    link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$uuid" "$sni" "$public_key" "$short_id")
                     ;;
                 "vless-grpc-reality")
                     local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
                     local public_key=$(echo "$node" | jq -r '.public_key // empty')
                     local short_id=$(echo "$node" | jq -r '.short_id // empty')
                     local service_name=$(echo "$node" | jq -r '.grpc_service // empty')
-                    link=$(generate_vless_grpc_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id" "$service_name")
+                    link=$(generate_vless_grpc_reality_link "$tag" "$server_ip" "$port" "$uuid" "$sni" "$public_key" "$short_id" "$service_name")
                     ;;
                 "vless-ws-tls")
                     local domain=$(echo "$node" | jq -r '.domain // empty')
                     local ws_path=$(echo "$node" | jq -r '.ws_path // empty')
-                    link=$(generate_vless_ws_tls_link "$tag" "$server_ip" "$port" "$secret" "$domain" "$ws_path")
+                    link=$(generate_vless_ws_tls_link "$tag" "$server_ip" "$port" "$uuid" "$domain" "$ws_path")
                     ;;
                 "hysteria2")
                     local domain=$(echo "$node" | jq -r '.domain // empty')
-                    link=$(generate_hysteria2_link "$tag" "$server_ip" "$port" "$secret" "$domain")
+                    link=$(generate_hysteria2_link "$tag" "$server_ip" "$port" "$uuid" "$domain")
                     ;;
                 "tuic")
                     local domain=$(echo "$node" | jq -r '.domain // empty')
                     local password=$(echo "$node" | jq -r '.password // empty')
-                    link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$password" "$domain")
+                    link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$uuid" "$password" "$domain")
                     ;;
             esac
             
@@ -108,28 +108,28 @@ generate_node_links_with_entry() {
                 local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
                 local public_key=$(echo "$node" | jq -r '.public_key // empty')
                 local short_id=$(echo "$node" | jq -r '.short_id // empty')
-                link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id")
+                link=$(generate_vless_reality_link "$tag" "$server_ip" "$port" "$uuid" "$sni" "$public_key" "$short_id")
                 ;;
             "vless-grpc-reality")
                 local sni=$(echo "$node" | jq -r '.sni // .server_name // empty')
                 local public_key=$(echo "$node" | jq -r '.public_key // empty')
                 local short_id=$(echo "$node" | jq -r '.short_id // empty')
                 local service_name=$(echo "$node" | jq -r '.grpc_service // empty')
-                link=$(generate_vless_grpc_reality_link "$tag" "$server_ip" "$port" "$secret" "$sni" "$public_key" "$short_id" "$service_name")
+                link=$(generate_vless_grpc_reality_link "$tag" "$server_ip" "$port" "$uuid" "$sni" "$public_key" "$short_id" "$service_name")
                 ;;
             "vless-ws-tls")
                 local domain=$(echo "$node" | jq -r '.domain // empty')
                 local ws_path=$(echo "$node" | jq -r '.ws_path // empty')
-                link=$(generate_vless_ws_tls_link "$tag" "$server_ip" "$port" "$secret" "$domain" "$ws_path")
+                link=$(generate_vless_ws_tls_link "$tag" "$server_ip" "$port" "$uuid" "$domain" "$ws_path")
                 ;;
             "hysteria2")
                 local domain=$(echo "$node" | jq -r '.domain // empty')
-                link=$(generate_hysteria2_link "$tag" "$server_ip" "$port" "$secret" "$domain")
+                link=$(generate_hysteria2_link "$tag" "$server_ip" "$port" "$uuid" "$domain")
                 ;;
             "tuic")
                 local domain=$(echo "$node" | jq -r '.domain // empty')
                 local password=$(echo "$node" | jq -r '.password // empty')
-                link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$secret" "$password" "$domain")
+                link=$(generate_tuic_link "$tag" "$server_ip" "$port" "$uuid" "$password" "$domain")
                 ;;
         esac
         
@@ -188,19 +188,19 @@ show_user_links() {
         if [ -n "$user_idx" ]; then
             local username
             username=$(jq -r --argjson idx "$((user_idx - 1))" '.[$idx].username' "$USERS_FILE")
-            local secret
-            secret=$(jq -r --argjson idx "$((user_idx - 1))" '.[$idx].secret' "$USERS_FILE")
+            local uuid
+            uuid=$(jq -r --argjson idx "$((user_idx - 1))" '.[$idx].uuid' "$USERS_FILE")
             
             echo -e "${BLUE}User: ${GREEN}$username${NC}"
             echo "$nodes_to_show" | while read -r node; do
                 [ -z "$node" ] && continue
-                generate_node_links_with_entry "$node" "$secret" "$server_ip"
+                generate_node_links_with_entry "$node" "$uuid" "$server_ip"
             done
         else
             # Tất cả user
             jq -c 'to_entries[]' "$USERS_FILE" | while read -r u_entry; do
                 local username=$(echo "$u_entry" | jq -r '.value.username')
-                local secret=$(echo "$u_entry" | jq -r '.value.secret')
+                local uuid=$(echo "$u_entry" | jq -r '.value.uuid')
                 local u_tag=$(echo "$u_entry" | jq -r '.value.tag')
                 
                 echo -e "${BLUE}--- User: ${GREEN}$username${NC} ---"
@@ -213,7 +213,7 @@ show_user_links() {
                 
                 echo "$u_nodes" | while read -r node; do
                     [ -z "$node" ] && continue
-                    generate_node_links_with_entry "$node" "$secret" "$server_ip"
+                    generate_node_links_with_entry "$node" "$uuid" "$server_ip"
                 done
             done
         fi
@@ -276,21 +276,21 @@ add_user() {
         return
     fi
 
-    local secret=""
+    local uuid=""
     if command -v uuidgen >/dev/null 2>&1; then
-        secret=$(uuidgen)
+        uuid=$(uuidgen)
     else
-        secret=$(cat /proc/sys/kernel/random/uuid)
+        uuid=$(cat /proc/sys/kernel/random/uuid)
     fi
-    echo -e "${GREEN} -> Đã tự động tạo UUID cho user: $secret${NC}"
+    echo -e "${GREEN} -> Đã tự động tạo UUID cho user: $uuid${NC}"
 
     if jq --arg username "$username" \
        --arg tag "$target_tag" \
-       --arg secret "$secret" \
+       --arg uuid "$uuid" \
        '. += [{
            "username": $username,
            "tag": $tag,
-           "secret": $secret,
+           "uuid": $uuid,
            "status": "active"
        }]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"; then
         echo -e "${GREEN}Thêm User thành công!${NC}"
@@ -355,15 +355,15 @@ reset_user_token() {
     fi
 
     if command -v jq &> /dev/null; then
-        local new_secret=""
+        local new_uuid=""
         if command -v uuidgen >/dev/null 2>&1; then
-            new_secret=$(uuidgen)
+            new_uuid=$(uuidgen)
         else
-            new_secret=$(cat /proc/sys/kernel/random/uuid)
+            new_uuid=$(cat /proc/sys/kernel/random/uuid)
         fi
 
         if [ -z "$user_choice" ]; then
-            jq --arg secret "$new_secret" '[.[] | .secret = $secret]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+            jq --arg uuid "$new_uuid" '[.[] | .uuid = $uuid]' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
             echo -e "${GREEN}Đã reset token thành công cho tất cả user!${NC}"
         else
             local real_idx=$((user_choice - 1))
@@ -377,10 +377,10 @@ reset_user_token() {
             fi
             
             jq --arg username "$username" \
-               --arg secret "$new_secret" \
-               '(.[] | select(.username == $username).secret) = $secret' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
+               --arg uuid "$new_uuid" \
+               '(.[] | select(.username == $username).uuid) = $uuid' "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
             echo -e "${GREEN}Đã reset token thành công cho user: $username${NC}"
-            echo -e "${GREEN}Token mới: $new_secret${NC}"
+            echo -e "${GREEN}Token mới: $new_uuid${NC}"
         fi
         build_and_apply_config
     else

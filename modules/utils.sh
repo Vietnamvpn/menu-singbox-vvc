@@ -410,6 +410,7 @@ extract_json_block() {
 build_and_apply_config() {
     local base_file="$1"
     local output_file="$2"
+    local data_dir="${DATA_DIR:-${INSTALL_DIR}/data}"
     
     log_info "Bắt đầu tạo file cấu hình cho Sing-box: $output_file"
     
@@ -418,17 +419,17 @@ build_and_apply_config() {
         return 1
     fi
     
-    if [ ! -f "$DATA_DIR/nodes.json" ] || [ ! -f "$DATA_DIR/users.json" ]; then
+    if [ ! -f "$data_dir/nodes.json" ] || [ ! -f "$data_dir/users.json" ]; then
         log_error "Thiếu file dữ liệu nodes.json hoặc users.json"
         return 1
     fi
 
     local temp_output="/tmp/singbox_config_temp.json"
-    local routing_file="$DATA_DIR/routing.json"
+    local routing_file="$data_dir/routing.json"
     
     # Đọc dữ liệu node, lọc user đang hoạt động và dựng cấu hình JSON
-    jq --argjson nodes "$(cat "$DATA_DIR/nodes.json")" \
-       --argjson users "$(cat "$DATA_DIR/users.json")" \
+    jq --argjson nodes "$(cat "$data_dir/nodes.json")" \
+       --argjson users "$(cat "$data_dir/users.json")" \
        --argjson routings "$([ -f "$routing_file" ] && cat "$routing_file" || echo "[]")" \
        '
        .inbounds = [] |
@@ -504,7 +505,7 @@ build_and_apply_config() {
                down_mbps: (if ($n.down_mbps != null and $n.down_mbps != "") then ($n.down_mbps | tonumber) else 100 end),
                users: ($matched_users | map({
                  name: .email,
-                 password: .password
+                 password: (.password // .uuid)
                })),
                tls: {
                  enabled: true,
@@ -522,7 +523,7 @@ build_and_apply_config() {
                users: ($matched_users | map({
                  name: .email,
                  uuid: .uuid,
-                 password: .password
+                 password: (.password // .uuid)
                })),
                congestion_control: "bbr",
                zero_rtt_handshake: true,
