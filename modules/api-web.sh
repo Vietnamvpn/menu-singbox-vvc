@@ -56,9 +56,10 @@ render_api_menu() {
         echo -e " ${GREEN}2.${NC} Bật dịch vụ API Daemon (Manager)"
         echo -e " ${GREEN}3.${NC} Tắt dịch vụ API Daemon (Manager)"
         echo -e " ${GREEN}4.${NC} Kiểm tra kết nối tới Web Trung Tâm"
+        echo -e " ${GREEN}5.${NC} Gửi thông tin / Link node thủ công lên Web"
         echo -e " ${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
-        read -p " Vui lòng chọn một chức năng [0-4]: " choice
+        read -p " Vui lòng chọn một chức năng [0-5]: " choice
 
         case "$choice" in
             1)
@@ -79,11 +80,14 @@ render_api_menu() {
             4)
                 test_api_connection
                 ;;
+            5)
+                send_manual_links
+                ;;
             0)
                 break
                 ;;
             *)
-                log_warn "Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 4."
+                log_warn "Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 5."
                 sleep 1
                 ;;
         esac
@@ -170,6 +174,103 @@ test_api_connection() {
         log_success "Kết nối thành công tới Web Trung Tâm! (Mã phản hồi HTTP: $response)"
     else
         log_warn "Không thể kết nối ổn định (Mã phản hồi HTTP: $response). Vui lòng kiểm tra lại URL, Port hoặc Token."
+    fi
+    read -p "Nhấn Enter để tiếp tục..."
+}
+
+# Gửi thủ công thông tin / link node lên Web Trung Tâm
+send_manual_links() {
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    echo -e "${YELLOW} GỬI THÔNG TIN / LINK NODE THỦ CÔNG${NC}"
+    echo -e "${CYAN}--------------------------------------------------${NC}"
+    if [ ! -f "$API_CONFIG_FILE" ]; then
+        log_warn "Chưa có cấu hình API nào được lưu."
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    local url
+    url=$(jq -r '.url // ""' "$API_CONFIG_FILE" 2>/dev/null)
+    local token
+    token=$(jq -r '.token // ""' "$API_CONFIG_FILE" 2>/dev/null)
+    local port
+    port=$(jq -r '.port // ""' "$API_CONFIG_FILE" 2>/dev/null)
+
+    if [ -z "$url" ] || [ -z "$port" ]; then
+        log_warn "URL hoặc Port trống, không thể gửi."
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    local nodes_file="${INSTALL_DIR}/data/nodes.json"
+    local entry_file="${INSTALL_DIR}/data/entry-node.json"
+
+    if [ ! -f "$nodes_file" ]; then
+        log_warn "Không tìm thấy file nodes.json"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    log_info "Đang chuẩn bị dữ liệu inbound để gửi lên web..."
+
+    local payload_json
+    payload_json=$(jq -n \
+        --argjson nodes "$(cat "$nodes_file")" \
+        --argjson entries "$([ -f "$entry_file" ] && cat "$entry_file" || echo "[]")" \
+        '{
+            action: "report_inbounds",
+            inbounds: [
+                $nodes[] as $n |
+                ($entries | map(select(.node_tag == $n.tag))) as $matched_entries |
+                if ($matched_entries | length) > 0 then
+                    $matched_entries[] as $entry |
+                    {
+                        type: $n.type,
+                        tag: $n.tag,
+                        domain: ($entry.address // $n.domain // $n.address),
+                        address: $entry.address,
+                        port: $entry.port,
+                        sni: $n.sni,
+                        public_key: $n.public_key,
+                        short_id: $n.short_id,
+                        ws_path: $n.ws_path,
+                        grpc_service: $n.grpc_service,
+                        password: $n.password
+                    }
+                else
+                    {
+                        type: $n.type,
+                        tag: $n.tag,
+                        domain: ($n.domain // $n.address // "VPS_IP_OR_DOMAIN"),
+                        address: $n.address,
+                        port: $n.port,
+                        sni: $n.sni,
+                        public_key: $n.public_key,
+                        short_id: $n.short_id,
+                        ws_path: $n.ws_path,
+                        grpc_service: $n.grpc_service,
+                        password: $n.password
+                    }
+                end
+            ]
+        }')
+
+    local response
+    response=$(curl -s -w "\n%{http_code}" \
+        -H "Content-Type: application/json" \
+        -H "X-API-Port: $port" \
+        -H "X-API-Token: $token" \
+        -d "$payload_json" "$url")
+
+    local http_code
+    http_code=$(echo "$response" | tail -n1)
+    local body
+    body=$(echo "$response" | head -n -1)
+
+    if [ "$http_code" = "200" ]; then
+        log_success "Đã gửi thông tin / link node thủ công lên Web Trung Tâm thành công!"
+    else
+        log_warn "Gửi thất bại (HTTP Code: $http_code). Phản hồi: $body"
     fi
     read -p "Nhấn Enter để tiếp tục..."
 }

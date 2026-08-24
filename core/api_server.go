@@ -239,69 +239,8 @@ func systemSyncRoutine() {
 			continue
 		}
 
-		func() {
-			var nodes []Node
-			if data, err := os.ReadFile(nodesFile); err == nil {
-				_ = json.Unmarshal(data, &nodes)
-			}
-
-			var reportInbounds []map[string]interface{}
-			for _, n := range nodes {
-				entries := getMatchingEntryNodes(n.Tag)
-				if len(entries) > 0 {
-					for _, entry := range entries {
-						domain := entry.Address
-						if domain == "" {
-							domain = n.Domain
-						}
-						if domain == "" {
-							domain = n.Address
-						}
-						reportInbounds = append(reportInbounds, map[string]interface{}{
-							"type":         n.Type,
-							"tag":          n.Tag,
-							"domain":       domain,
-							"address":      entry.Address,
-							"port":         entry.Port,
-							"sni":          n.SNI,
-							"public_key":   n.PublicKey,
-							"short_id":     n.ShortID,
-							"ws_path":      n.WSPath,
-							"grpc_service": n.GRPCService,
-							"password":     n.Password,
-						})
-					}
-				} else {
-					domain := n.Domain
-					if domain == "" {
-						domain = n.Address
-					}
-					if domain == "" {
-						domain = "VPS_IP_OR_DOMAIN"
-					}
-					reportInbounds = append(reportInbounds, map[string]interface{}{
-						"type":         n.Type,
-						"tag":          n.Tag,
-						"domain":       domain,
-						"address":      n.Address,
-						"port":         n.Port,
-						"sni":          n.SNI,
-						"public_key":   n.PublicKey,
-						"short_id":     n.ShortID,
-						"ws_path":      n.WSPath,
-						"grpc_service": n.GRPCService,
-						"password":     n.Password,
-					})
-				}
-			}
-
-			if len(reportInbounds) > 0 {
-				var res map[string]interface{}
-				_ = sendApiRequest("report_inbounds", map[string]interface{}{
-					"inbounds": reportInbounds,
-				}, &res)
-			}
-		}()
+		// Đã tắt hoàn toàn tính năng tự động gửi report_inbounds định kỳ ngầm tại đây.
+		// Việc gửi thông tin / link node được chuyển hoàn toàn sang thao tác thủ công trên api-web.sh.
 
 		func() {
 			var taskResp TasksResponse
