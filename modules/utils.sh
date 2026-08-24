@@ -547,6 +547,12 @@ build_and_apply_config() {
          .route.rules = ((.route.rules // []) + $routings)
        else
          .
+       end |
+       if .experimental.v2ray_api.stats != null then
+         .experimental.v2ray_api.stats.inbounds = ($nodes | map(.tag)) |
+         .experimental.v2ray_api.stats.users = ($users | map(.username // .Username))
+       else
+         .
        end
        ' "$base_file" > "$temp_output"
 
