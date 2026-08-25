@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -99,12 +100,12 @@ func main() {
 	os.MkdirAll(LogDir, 0755)
 	//--------------------------
 	// Cấu hình ghi log ra đồng thời màn hình console và file server.log
-	//logFile, err := os.OpenFile(filepath.Join(LogDir, "server.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	//if err == nil {
-	//	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
-	//} else {
-	//	log.Printf("Không thể mở file log hệ thống: %v", err)
-	//}
+	logFile, err := os.OpenFile(filepath.Join(LogDir, "server.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+	} else {
+		log.Printf("Không thể mở file log hệ thống: %v", err)
+	}
 	//--------------------------
 	go systemSyncRoutine()
 
