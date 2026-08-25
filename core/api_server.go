@@ -265,7 +265,17 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 		}()
 
 		func() {
-			logs := []map[string]interface{}{}
+			// Thay thế map[string]interface{} bằng struct để ép buộc thứ tự key khi xuất ra JSON
+			type TrafficLog struct {
+				Time     string   `json:"time"`
+				Username string   `json:"username"`
+				Upload   int64    `json:"upload"`
+				Download int64    `json:"download"`
+				IPCount  int      `json:"ip_count"`
+				IPs      []string `json:"ips"`
+				Inbounds []string `json:"inbounds"`
+			}
+			var logs []TrafficLog
 
 			// --- BẮT ĐẦU: Bóc tách log trực tiếp từ sing-box.log (Đã fix chuẩn theo định dạng thực tế) ---
 			userIPs := make(map[string]map[string]bool)
@@ -433,13 +443,14 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 						inbounds = append(inbounds, ib)
 					}
 
-					logs = append(logs, map[string]interface{}{
-						"username": u,
-						"upload":   t["upload"],
-						"download": t["download"],
-						"ip_count": len(userIPs[u]),
-						"ips":      ips,
-						"inbounds": inbounds,
+					logs = append(logs, TrafficLog{
+						Time:     time.Now().Format("2006-01-02 15:04:05"),
+						Username: u,
+						Upload:   t["upload"],
+						Download: t["download"],
+						IPCount:  len(userIPs[u]),
+						IPs:      ips,
+						Inbounds: inbounds,
 					})
 				}
 
