@@ -88,7 +88,7 @@ render_api_menu() {
                 clear
                 echo -e "${YELLOW}Đang mở Log API Trực tiếp của Manager (Nhấn Ctrl+C để thoát)...${NC}"
                 echo -e "${CYAN}================================================================${NC}"
-                journalctl -u manager -f -n 100
+                journalctl -u manager -f -n 50
                 echo ""
                 read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
                 ;;
