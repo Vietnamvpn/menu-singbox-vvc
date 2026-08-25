@@ -187,4 +187,4 @@ chmod +x /usr/local/bin/vvc
 log_success "=================================================="
 log_success "${GREEN} LẮP ĐẶT HOÀN TẤT HỆ THỐNG MENU SINGBOX VVC${NC}"
 echo -e "${YELLOW} Gõ lệnh: vvc để truy cập Menu Quản Lý${NC}"
-log_success "=================================================="
+echo -e "======================================================="
