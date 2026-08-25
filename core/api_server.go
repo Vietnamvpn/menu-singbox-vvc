@@ -286,14 +286,22 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 								if metadata, ok := conn["metadata"].(map[string]interface{}); ok {
 									sourceIP, _ := metadata["sourceIP"].(string)
 
-									// Sing-box thường map user vào metadata.user hoặc rule
+									// Lấy username từ metadata.type (ví dụ: "tuic/Vn-5485" -> "Vn-5485")
 									username := ""
-									if u, ok := metadata["user"].(string); ok && u != "" {
-										username = u
-									} else if rule, ok := conn["rule"].(string); ok && rule != "" {
-										username = rule
-									} else if rulePayload, ok := conn["rulePayload"].(string); ok && rulePayload != "" {
-										username = rulePayload
+									if connType, ok := metadata["type"].(string); ok && connType != "" {
+										parts := strings.Split(connType, "/")
+										if len(parts) >= 2 {
+											username = parts[1]
+										}
+									}
+									if username == "" {
+										if u, ok := metadata["user"].(string); ok && u != "" {
+											username = u
+										} else if rule, ok := conn["rule"].(string); ok && rule != "" {
+											username = rule
+										} else if rulePayload, ok := conn["rulePayload"].(string); ok && rulePayload != "" {
+											username = rulePayload
+										}
 									}
 
 									if sourceIP != "" && username != "" {
