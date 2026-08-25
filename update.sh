@@ -135,7 +135,7 @@ fi
 ln -sf "$INSTALL_DIR/main.sh" /usr/local/bin/vvc
 chmod +x /usr/local/bin/vvc
 
-log_success "=================================================="
+log_success "==================================================================================================="
 log_success " CẬP NHẬT HOÀN TẤT!"
 log_success " Tất cả tệp bị thiếu đã được khôi phục."
 log_success " Dữ liệu node và user của bạn được bảo vệ an toàn."
