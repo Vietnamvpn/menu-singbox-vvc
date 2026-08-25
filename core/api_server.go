@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -267,6 +268,55 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 		func() {
 			logs := []map[string]interface{}{}
 
+			// --- BẮT ĐẦU: Lấy danh sách kết nối từ Clash API ---
+			userIPs := make(map[string]map[string]bool)
+			clashResp, err := http.Get("http://127.0.0.1:9090/connections")
+			if err == nil {
+				defer clashResp.Body.Close()
+				rawClashData, _ := io.ReadAll(clashResp.Body)
+
+				// Lưu log raw data để kiểm tra cấu trúc JSON thực tế
+				_ = os.WriteFile(filepath.Join(LogDir, "clash_connections_raw.json"), rawClashData, 0644)
+
+				var clashData map[string]interface{}
+				if json.Unmarshal(rawClashData, &clashData) == nil {
+					if conns, ok := clashData["connections"].([]interface{}); ok {
+						for _, c := range conns {
+							if conn, ok := c.(map[string]interface{}); ok {
+								if metadata, ok := conn["metadata"].(map[string]interface{}); ok {
+									sourceIP, _ := metadata["sourceIP"].(string)
+
+									// Sing-box thường map user vào metadata.user hoặc rule
+									username := ""
+									if u, ok := metadata["user"].(string); ok && u != "" {
+										username = u
+									} else if rule, ok := conn["rule"].(string); ok && rule != "" {
+										username = rule
+									} else if rulePayload, ok := conn["rulePayload"].(string); ok && rulePayload != "" {
+										username = rulePayload
+									}
+
+									if sourceIP != "" && username != "" {
+										if userIPs[username] == nil {
+											userIPs[username] = make(map[string]bool)
+										}
+										userIPs[username][sourceIP] = true
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Lưu log file số lượng IP đã phân tích để kiểm chứng
+				if parsedData, err := json.MarshalIndent(userIPs, "", "  "); err == nil {
+					_ = os.WriteFile(filepath.Join(LogDir, "clash_connections_parsed.json"), parsedData, 0644)
+				}
+			} else {
+				log.Printf("[CLASH API LỖI] Không thể kết nối tới port 9090: %v", err)
+			}
+			// --- KẾT THÚC: Lấy danh sách kết nối từ Clash API ---
+
 			grpcurlPath, err := exec.LookPath("grpcurl")
 			if err != nil {
 				grpcurlPath = "grpcurl"
@@ -317,11 +367,19 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 					}
 				}
 
+				// Đảm bảo những user có IP kết nối (dù không có traffic sinh ra trong lần quét này) vẫn có mặt trong danh sách
+				for u := range userIPs {
+					if _, exists := userTraffic[u]; !exists {
+						userTraffic[u] = map[string]int64{"upload": 0, "download": 0}
+					}
+				}
+
 				for u, t := range userTraffic {
 					logs = append(logs, map[string]interface{}{
 						"username": u,
 						"upload":   t["upload"],
 						"download": t["download"],
+						"ip_count": len(userIPs[u]),
 					})
 				}
 
@@ -395,6 +453,7 @@ func executeTask(task Task) bool {
 			for i, u := range users {
 				if u.Username == username {
 					users[i].UUID = uuid
+					users[i].Status = "active" // Tự động cập nhật thành active nếu user đã tồn tại
 					if status != "" {
 						users[i].Status = status
 					}
