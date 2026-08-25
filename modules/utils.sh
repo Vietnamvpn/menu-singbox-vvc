@@ -744,4 +744,4 @@ parse_singbox_logs() {
     done
 
     > "$log_file"
-}
+    }
