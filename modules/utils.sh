@@ -673,3 +673,75 @@ generate_tuic_link() {
     
     echo "$link"
 }
+
+parse_singbox_logs() {
+    local log_file="/opt/menu-singbox-vvc/logs/sing-box.log"
+    local json_dir="/opt/menu-singbox-vvc/data/connections"
+    
+    if [ ! -f "$log_file" ] || [ ! -s "$log_file" ]; then
+        return 0
+    }
+
+    mkdir -p "$json_dir"
+
+    awk '
+    {
+        cid = "";
+        for(i=1; i<=NF; i++) {
+            if ($i ~ /^\[[0-9]+$/) {
+                cid = substr($i, 2);
+                break;
+            }
+        }
+        if (cid == "") next;
+
+        if ($0 ~ /inbound connection from/) {
+            for(i=1; i<=NF; i++) {
+                if ($i ~ /^inbound\//) {
+                    split($i, a, "[");
+                    split(a[2], b, "]");
+                    inbound[cid] = b[1];
+                }
+                if ($i == "from") {
+                    ip_port = $(i+1);
+                    sub(/:[0-9]+$/, "", ip_port);
+                    ip[cid] = ip_port;
+                }
+            }
+        }
+
+        if ($0 ~ /inbound connection to/) {
+            for(i=1; i<=NF; i++) {
+                if ($i ~ /^\[.+\]/ && $i !~ /\[[0-9]+/) {
+                    u = $i;
+                    gsub(/^\[|\]$/, "", u);
+                    user[cid] = u;
+                }
+            }
+        }
+    }
+    END {
+        for (cid in user) {
+            u = user[cid];
+            i = ip[cid];
+            ib = inbound[cid];
+            if (u != "" && i != "") {
+                print u "|" i "|" ib;
+            }
+        }
+    }
+    ' "$log_file" | while IFS='|' read -r u i ib; do
+        [ -z "$u" ] && continue
+        local user_json="$json_dir/${u}.json"
+        
+        if [ ! -f "$user_json" ]; then
+            echo '{"user": "'"$u"'", "connections": []}' > "$user_json"
+        fi
+        
+        jq --arg ip "$i" --arg inbound "$ib" \
+           '.connections += [{"ip": $ip, "inbound": $inbound, "time": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}]' \
+           "$user_json" > "${user_json}.tmp" && mv "${user_json}.tmp" "$user_json"
+    done
+
+    > "$log_file"
+}
