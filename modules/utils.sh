@@ -113,6 +113,7 @@ start_singbox() {
     systemctl start sing-box
     if systemctl is-active --quiet sing-box; then
         log_success "Sing-box đã khởi động thành công."
+        parse_singbox_logs
     else
         log_error "Không thể khởi động Sing-box. Vui lòng kiểm tra log!"
     fi
@@ -131,6 +132,7 @@ restart_singbox() {
     systemctl restart sing-box
     if systemctl is-active --quiet sing-box; then
         log_success "Khởi động lại Sing-box thành công."
+        parse_singbox_logs
     else
         log_error "Không thể khởi động lại Sing-box. Vui lòng kiểm tra log!"
     fi
