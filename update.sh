@@ -139,8 +139,8 @@ log_success "=================================================="
 log_success " CẬP NHẬT HOÀN TẤT!"
 log_success " Tất cả tệp bị thiếu đã được khôi phục."
 log_success " Dữ liệu node và user của bạn được bảo vệ an toàn."
-echo -e "${YELLOW} Hệ thống đang tự động thoát menu. Hãy gõ lệnh (vvc) để vào lại và áp dụng các thay đổi.${NC}"
-echo -e "======================================================="
+echo -e "${YELLOW}[Hệ thống đang tự động thoát menu. Hãy gõ lệnh (vvc) để vào lại và áp dụng các thay đổi.]${NC}"
+echo -e "==============================================================="
 
 # Chờ 2 giây để người dùng kịp đọc thông báo, sau đó tự động tắt tiến trình gọi (main menu)
 sleep 2
