@@ -267,14 +267,13 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 		func() {
 			logs := []map[string]interface{}{}
 
-			// --- BẮT ĐẦU: Bóc tách log trực tiếp từ sing-box.log ---
+			// --- BẮT ĐẦU: Bóc tách log trực tiếp từ sing-box.log (Đã fix chuẩn theo định dạng thực tế) ---
 			userIPs := make(map[string]map[string]bool)
 			userInbounds := make(map[string]map[string]bool)
 
 			logFilePath := filepath.Join(LogDir, "sing-box.log")
 			logData, err := os.ReadFile(logFilePath)
 			if err == nil && len(logData) > 0 {
-				// Xóa sạch file log ngay sau khi đọc để tránh phình to dữ liệu
 				_ = os.WriteFile(logFilePath, []byte(""), 0644)
 
 				lines := strings.Split(string(logData), "\n")
@@ -289,8 +288,8 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 					var cid string
 					fields := strings.Fields(line)
 					for _, f := range fields {
-						if strings.HasPrefix(f, "[") && strings.HasSuffix(f, "]") && len(f) > 2 {
-							inner := f[1 : len(f)-1]
+						if strings.HasPrefix(f, "[") && len(f) > 1 {
+							inner := strings.TrimPrefix(f, "[")
 							isNum := true
 							for _, r := range inner {
 								if r < '0' || r > '9' {
@@ -308,23 +307,23 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 						continue
 					}
 
-					if strings.Contains(line, "inbound connection from") {
-						for i, f := range fields {
-							if strings.HasPrefix(f, "inbound/") {
-								parts := strings.Split(f, "[")
-								if len(parts) >= 2 {
-									ibParts := strings.Split(parts[1], "]")
-									if len(ibParts) > 0 {
-										connInbound[cid] = ibParts[0]
-									}
+					for _, f := range fields {
+						if strings.Contains(f, "inbound/") {
+							if idxOpen := strings.Index(f, "["); idxOpen != -1 {
+								if idxClose := strings.Index(f[idxOpen:], "]"); idxClose != -1 {
+									connInbound[cid] = f[idxOpen+1 : idxOpen+idxClose]
 								}
 							}
+						}
+					}
+
+					if strings.Contains(line, "inbound connection from") {
+						for i, f := range fields {
 							if f == "from" && i+1 < len(fields) {
 								ipPort := fields[i+1]
 								if idx := strings.LastIndex(ipPort, ":"); idx != -1 {
 									ipPort = ipPort[:idx]
 								}
-								// Loại bỏ tiền tố IPv6-mapped [::ffff: và ngoặc vuông kết thúc
 								ipPort = strings.TrimPrefix(ipPort, "[::ffff:")
 								ipPort = strings.TrimSuffix(ipPort, "]")
 								connIP[cid] = ipPort
@@ -418,7 +417,6 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 					}
 				}
 
-				// Đảm bảo những user có IP kết nối (dù không có traffic sinh ra trong lần quét này) vẫn có mặt trong danh sách
 				for u := range userIPs {
 					if _, exists := userTraffic[u]; !exists {
 						userTraffic[u] = map[string]int64{"upload": 0, "download": 0}
@@ -446,13 +444,10 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 				}
 
 				if len(logs) > 0 {
-					//---------------------------
-					// Lưu gom chung báo cáo lưu lượng và IP vào cùng một file traffic_report.json duy nhất
 					trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
 					if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
 						_ = os.WriteFile(trafficReportFile, reportData, 0644)
 					}
-					//---------------------------
 
 					log.Printf("[TRAFFIC REPORT] Đang gửi dữ liệu sử dụng và IP của %d user lên web", len(logs))
 
