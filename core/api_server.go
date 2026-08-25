@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -268,62 +267,106 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 		func() {
 			logs := []map[string]interface{}{}
 
-			// --- BẮT ĐẦU: Lấy danh sách kết nối từ Clash API ---
+			// --- BẮT ĐẦU: Bóc tách log trực tiếp từ sing-box.log ---
 			userIPs := make(map[string]map[string]bool)
-			clashResp, err := http.Get("http://127.0.0.1:9090/connections")
-			if err == nil {
-				defer clashResp.Body.Close()
-				rawClashData, _ := io.ReadAll(clashResp.Body)
+			userInbounds := make(map[string]map[string]bool)
 
-				// Lưu log raw data để kiểm tra cấu trúc JSON thực tế
-				_ = os.WriteFile(filepath.Join(LogDir, "clash_connections_raw.json"), rawClashData, 0644)
+			logFilePath := filepath.Join(LogDir, "sing-box.log")
+			logData, err := os.ReadFile(logFilePath)
+			if err == nil && len(logData) > 0 {
+				// Xóa sạch file log ngay sau khi đọc để tránh phình to dữ liệu
+				_ = os.WriteFile(logFilePath, []byte(""), 0644)
 
-				var clashData map[string]interface{}
-				if json.Unmarshal(rawClashData, &clashData) == nil {
-					if conns, ok := clashData["connections"].([]interface{}); ok {
-						for _, c := range conns {
-							if conn, ok := c.(map[string]interface{}); ok {
-								if metadata, ok := conn["metadata"].(map[string]interface{}); ok {
-									sourceIP, _ := metadata["sourceIP"].(string)
+				lines := strings.Split(string(logData), "\n")
+				connUser := make(map[string]string)
+				connIP := make(map[string]string)
+				connInbound := make(map[string]string)
 
-									// Lấy username từ metadata.type (ví dụ: "tuic/Vn-5485" -> "Vn-5485")
-									username := ""
-									if connType, ok := metadata["type"].(string); ok && connType != "" {
-										parts := strings.Split(connType, "/")
-										if len(parts) >= 2 {
-											username = parts[1]
-										}
+				for _, line := range lines {
+					if line == "" {
+						continue
+					}
+					var cid string
+					fields := strings.Fields(line)
+					for _, f := range fields {
+						if strings.HasPrefix(f, "[") && strings.HasSuffix(f, "]") && len(f) > 2 {
+							inner := f[1 : len(f)-1]
+							isNum := true
+							for _, r := range inner {
+								if r < '0' || r > '9' {
+									isNum = false
+									break
+								}
+							}
+							if isNum {
+								cid = inner
+								break
+							}
+						}
+					}
+					if cid == "" {
+						continue
+					}
+
+					if strings.Contains(line, "inbound connection from") {
+						for i, f := range fields {
+							if strings.HasPrefix(f, "inbound/") {
+								parts := strings.Split(f, "[")
+								if len(parts) >= 2 {
+									ibParts := strings.Split(parts[1], "]")
+									if len(ibParts) > 0 {
+										connInbound[cid] = ibParts[0]
 									}
-									if username == "" {
-										if u, ok := metadata["user"].(string); ok && u != "" {
-											username = u
-										} else if rule, ok := conn["rule"].(string); ok && rule != "" {
-											username = rule
-										} else if rulePayload, ok := conn["rulePayload"].(string); ok && rulePayload != "" {
-											username = rulePayload
-										}
-									}
+								}
+							}
+							if f == "from" && i+1 < len(fields) {
+								ipPort := fields[i+1]
+								if idx := strings.LastIndex(ipPort, ":"); idx != -1 {
+									ipPort = ipPort[:idx]
+								}
+								// Loại bỏ tiền tố IPv6-mapped [::ffff: và ngoặc vuông kết thúc
+								ipPort = strings.TrimPrefix(ipPort, "[::ffff:")
+								ipPort = strings.TrimSuffix(ipPort, "]")
+								connIP[cid] = ipPort
+							}
+						}
+					}
 
-									if sourceIP != "" && username != "" {
-										if userIPs[username] == nil {
-											userIPs[username] = make(map[string]bool)
-										}
-										userIPs[username][sourceIP] = true
+					if strings.Contains(line, "inbound connection to") {
+						for _, f := range fields {
+							if strings.HasPrefix(f, "[") && strings.HasSuffix(f, "]") && len(f) > 2 {
+								inner := f[1 : len(f)-1]
+								isNum := true
+								for _, r := range inner {
+									if r < '0' || r > '9' {
+										isNum = false
+										break
 									}
+								}
+								if !isNum {
+									connUser[cid] = inner
 								}
 							}
 						}
 					}
 				}
 
-				// Lưu log file số lượng IP đã phân tích để kiểm chứng
-				if parsedData, err := json.MarshalIndent(userIPs, "", "  "); err == nil {
-					_ = os.WriteFile(filepath.Join(LogDir, "clash_connections_parsed.json"), parsedData, 0644)
+				for cid, u := range connUser {
+					if ip, ok := connIP[cid]; ok && ip != "" {
+						if userIPs[u] == nil {
+							userIPs[u] = make(map[string]bool)
+						}
+						userIPs[u][ip] = true
+					}
+					if ib, ok := connInbound[cid]; ok && ib != "" {
+						if userInbounds[u] == nil {
+							userInbounds[u] = make(map[string]bool)
+						}
+						userInbounds[u][ib] = true
+					}
 				}
-			} else {
-				log.Printf("[CLASH API LỖI] Không thể kết nối tới port 9090: %v", err)
 			}
-			// --- KẾT THÚC: Lấy danh sách kết nối từ Clash API ---
+			// --- KẾT THÚC: Bóc tách log từ sing-box.log ---
 
 			grpcurlPath, err := exec.LookPath("grpcurl")
 			if err != nil {
@@ -383,29 +426,40 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 				}
 
 				for u, t := range userTraffic {
+					var ips []string
+					for ip := range userIPs[u] {
+						ips = append(ips, ip)
+					}
+					var inbounds []string
+					for ib := range userInbounds[u] {
+						inbounds = append(inbounds, ib)
+					}
+
 					logs = append(logs, map[string]interface{}{
 						"username": u,
 						"upload":   t["upload"],
 						"download": t["download"],
 						"ip_count": len(userIPs[u]),
+						"ips":      ips,
+						"inbounds": inbounds,
 					})
 				}
 
 				if len(logs) > 0 {
 					//---------------------------
-					// Lưu báo cáo lưu lượng vào file traffic_report.json
+					// Lưu gom chung báo cáo lưu lượng và IP vào cùng một file traffic_report.json duy nhất
 					trafficReportFile := filepath.Join(LogDir, "traffic_report.json")
 					if reportData, err := json.MarshalIndent(logs, "", "  "); err == nil {
 						_ = os.WriteFile(trafficReportFile, reportData, 0644)
 					}
 					//---------------------------
 
-					log.Printf("[TRAFFIC REPORT] Đang gửi dữ liệu sử dụng của %d user lên web", len(logs))
+					log.Printf("[TRAFFIC REPORT] Đang gửi dữ liệu sử dụng và IP của %d user lên web", len(logs))
 
 					if apiErr := sendApiRequest("report_traffic", map[string]interface{}{"logs": logs}, nil); apiErr != nil {
 						log.Printf("[TRAFFIC API LỖI] Không thể gửi dữ liệu lên web: %v", apiErr)
 					} else {
-						log.Printf("[TRAFFIC API THÀNH CÔNG] Đã đẩy dữ liệu lưu lượng lên web.")
+						log.Printf("[TRAFFIC API THÀNH CÔNG] Đã đẩy dữ liệu lưu lượng và IP lên web.")
 					}
 				} else {
 					log.Printf("[TRAFFIC REPORT] Không tìm thấy lưu lượng user nào trong dữ liệu từ grpcurl.")
@@ -429,7 +483,7 @@ func executeTask(task Task) bool {
 
 	var payload map[string]interface{}
 	if len(task.Payload) > 0 {
-		if err := json.Unmarshal(task.Payload, &payload); err != nil {
+		if err := json.NewDecoder(task.Payload, &payload); err != nil {
 			var payloadStr string
 			if errStr := json.Unmarshal(task.Payload, &payloadStr); errStr == nil {
 				_ = json.Unmarshal([]byte(payloadStr), &payload)
