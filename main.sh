@@ -26,7 +26,7 @@ show_banner() {
     echo -e "${BLUE}                     -------------------               ${NC}"
     echo -e ""
     echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR | ${YELLOW}Website:${NC} $WEBSITE" 
-    echo -e " ${YELLOW}Core Ver:${NC} $(get_singbox_version) | ${YELLOW}Trạng thái:${NC} $(get_singbox_status) | ${YELLOW}Phiên bản:${NC} $VERSION"
+    echo -e " ${YELLOW}Trạng thái:${NC} $(get_singbox_status) | ${YELLOW}Phiên bản:${NC} $VERSION"
     echo -e "${BLUE}================================================================${NC}"
 }
 
@@ -37,9 +37,9 @@ show_routing_menu() {
         echo -e "${BLUE}================================================================${NC}"
         echo -e "${BLUE}||${NC}                    ${YELLOW}QUẢN LÝ ROUTING & RELAY${NC}                  ${BLUE}||${NC}"
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${GREEN} 1.${NC} Thêm Entry"
-        echo -e "${GREEN} 2.${NC} Thêm Outbound"
-        echo -e "${GREEN} 3.${NC} Thêm Routing"
+        echo -e "${GREEN} 1.${NC} Quản Lý Entry"
+        echo -e "${GREEN} 2.${NC} Quản Lý Outbound"
+        echo -e "${GREEN} 3.${NC} Quản Lý Routing"
         echo -e "${RED} 0.${NC} Quay Lại Menu Chính"
         echo -e "${CYAN}================================================================${NC}"
         read -p " Vui lòng chọn chức năng [0-3]: " sub_choice
@@ -92,11 +92,11 @@ show_routing_menu() {
 show_menu() {
     clear
     show_banner
-    echo -e " ${GREEN}1.${NC} Quản Lý Node              ${CYAN}│${NC}  ${GREEN}2.${NC} Quản Lý Routing & Relay"
-    echo -e " ${GREEN}3.${NC} Quản Lý Người Dùng        ${CYAN}│${NC}  ${GREEN}4.${NC} Quản Lý Chứng Chỉ SSL"
-    echo -e " ${GREEN}5.${NC} Quản Lý Sing Box          ${CYAN}│${NC}  ${GREEN}6.${NC} API Web Trung Tâm"
-    echo -e " ${GREEN}7.${NC} Kích Hoạt BBR & Thêm Swap ${CYAN}│${NC}  ${GREEN}8.${NC} Cập Nhật Hệ Thống"
-    echo -e " ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn           ${CYAN}│${NC}  ${RED}0.${NC} Thoát Khỏi Menu"
+    echo -e " ${GREEN}1.${NC} Quản Lý Node              ${CYAN}│${NC}  ${GREEN}6.${NC} API Web Trung Tâm"
+    echo -e " ${GREEN}2.${NC} Quản Lý Người Dùng        ${CYAN}│${NC}  ${GREEN}7.${NC} Kích Hoạt BBR & Thêm Swap"
+    echo -e " ${GREEN}3.${NC} Quản Lý Routing & Relay   ${CYAN}│${NC}  ${GREEN}8.${NC} Cập Nhật Hệ Thống"
+    echo -e " ${GREEN}4.${NC} Quản Lý Chứng Chỉ SSL     ${CYAN}│${NC}  ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn"
+    echo -e " ${GREEN}5.${NC} Quản Lý Sing Box          ${CYAN}│${NC}  ${RED}0.${NC} Thoát Khỏi Menu"
     echo -e "${CYAN}================================================================${NC}"
     read -p " Vui lòng chọn một chức năng [0-9]: " choice
 
@@ -112,9 +112,6 @@ show_menu() {
             fi
             ;;
         2)
-            show_routing_menu
-            ;;
-        3)
             clear
             log_info "Đang mở Quản lý Người dùng..."
             if [ -f "$INSTALL_DIR/modules/users.sh" ]; then
@@ -123,6 +120,9 @@ show_menu() {
                 log_warn "Chưa có module users.sh"
                 read -n 1 -s -r -p "Nhấn phím bất kỳ để quay lại..."
             fi
+            ;;
+        3)
+            show_routing_menu
             ;;
         4)
             clear

@@ -57,9 +57,10 @@ render_api_menu() {
         echo -e " ${GREEN}3.${NC} Tắt dịch vụ API Daemon (Manager)"
         echo -e " ${GREEN}4.${NC} Kiểm tra kết nối tới Web Trung Tâm"
         echo -e " ${GREEN}5.${NC} Gửi thông tin / Link node thủ công lên Web"
+        echo -e " ${YELLOW}6.${NC} Xem Log API Trực Tiếp"
         echo -e " ${RED}0.${NC} Quay lại Menu Chính"
         echo -e "${BLUE}================================================================${NC}"
-        read -p " Vui lòng chọn một chức năng [0-5]: " choice
+        read -p " Vui lòng chọn một chức năng [0-6]: " choice
 
         case "$choice" in
             1)
@@ -83,11 +84,19 @@ render_api_menu() {
             5)
                 send_manual_links
                 ;;
+            6)
+                clear
+                echo -e "${YELLOW}Đang mở Log API Trực tiếp của Manager (Nhấn Ctrl+C để thoát)...${NC}"
+                echo -e "${CYAN}================================================================${NC}"
+                journalctl -u manager -f -n 100
+                echo ""
+                read -n 1 -s -r -p "Nhấn phím bất kỳ để tiếp tục..."
+                ;;
             0)
                 break
                 ;;
             *)
-                log_warn "Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 5."
+                log_warn "Lựa chọn không hợp lệ, vui lòng chọn từ 0 đến 6."
                 sleep 1
                 ;;
         esac
