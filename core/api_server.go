@@ -483,7 +483,7 @@ func executeTask(task Task) bool {
 
 	var payload map[string]interface{}
 	if len(task.Payload) > 0 {
-		if err := json.NewDecoder(task.Payload, &payload); err != nil {
+		if err := json.Unmarshal(task.Payload, &payload); err != nil {
 			var payloadStr string
 			if errStr := json.Unmarshal(task.Payload, &payloadStr); errStr == nil {
 				_ = json.Unmarshal([]byte(payloadStr), &payload)
