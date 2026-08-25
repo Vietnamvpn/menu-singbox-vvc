@@ -78,7 +78,6 @@ declare -A DATA_FILES=(
     ["$INSTALL_DIR/data/routing.json"]="[]"
     ["$INSTALL_DIR/data/domain.json"]="[]"
     ["$INSTALL_DIR/data/entry-node.json"]="[]"
-    ["$INSTALL_DIR/data/local_state.json"]="{}"
 )
 
 for file in "${!DATA_FILES[@]}"; do
@@ -140,5 +139,9 @@ log_success "=================================================="
 log_success " CẬP NHẬT HOÀN TẤT!"
 log_success " Tất cả tệp bị thiếu đã được khôi phục."
 log_success " Dữ liệu node và user của bạn được bảo vệ an toàn."
-log_success " Hãy thoát khỏi menu điều khiển bằng phím 0 rồi vào lại (vvc) để áp dụng các thay đổi."
+echo -e "${YELLOW} Hệ thống đang tự động thoát menu. Hãy gõ lệnh (vvc) để vào lại và áp dụng các thay đổi.${NC}"
 log_success "=================================================="
+
+# Chờ 2 giây để người dùng kịp đọc thông báo, sau đó tự động tắt tiến trình gọi (main menu)
+sleep 2
+kill -9 $PPID 2>/dev/null
