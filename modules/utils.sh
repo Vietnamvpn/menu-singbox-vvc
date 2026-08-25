@@ -588,6 +588,8 @@ build_and_apply_config() {
 
     mv "$temp_output" "$output_file"
     log_info "Đã cập nhật file cấu hình Sing-box thành công tại: $output_file"
+
+    set_singbox_log "$output_file"
     
     if systemctl is-active --quiet sing-box; then
         log_info "Đang reload dịch vụ Sing-box..."
