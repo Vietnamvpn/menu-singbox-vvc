@@ -688,8 +688,9 @@ parse_singbox_logs() {
     {
         cid = "";
         for(i=1; i<=NF; i++) {
-            if ($i ~ /^\[[0-9]+$/) {
-                cid = substr($i, 2);
+            if ($i ~ /^\[[0-9]+/) {
+                cid = $i;
+                gsub(/^\[/, "", cid);
                 break;
             }
         }
@@ -744,4 +745,4 @@ parse_singbox_logs() {
     done
 
     > "$log_file"
-    }
+}
