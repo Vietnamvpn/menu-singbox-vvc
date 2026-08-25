@@ -676,13 +676,17 @@ generate_tuic_link() {
 
 parse_singbox_logs() {
     local log_file="/opt/menu-singbox-vvc/logs/sing-box.log"
-    local json_dir="/opt/menu-singbox-vvc/data/connections"
+    local shared_json="/opt/menu-singbox-vvc/data/connections.json"
     
     if [ ! -f "$log_file" ] || [ ! -s "$log_file" ]; then
         return 0
     fi
 
-    mkdir -p "$json_dir"
+    mkdir -p "$(dirname "$shared_json")"
+    
+    if [ ! -f "$shared_json" ]; then
+        echo '{"connections": []}' > "$shared_json"
+    fi
 
     awk '
     {
@@ -727,23 +731,44 @@ parse_singbox_logs() {
             i = ip[cid];
             ib = inbound[cid];
             if (u != "" && i != "") {
-                print u "|" i "|" ib;
+                if (!(u in seen)) {
+                    seen[u] = 1;
+                    u_order[++cnt] = u;
+                }
+                if (index(u_ips[u], i) == 0) {
+                    if (u_ips[u] == "") u_ips[u] = i;
+                    else u_ips[u] = u_ips[u] ", " i;
+                }
+                if (index(u_inbounds[u], ib) == 0) {
+                    if (u_inbounds[u] == "") u_inbounds[u] = ib;
+                    else u_inbounds[u] = u_inbounds[u] ", " ib;
+                }
             }
         }
+        for (k=1; k<=cnt; k++) {
+            u = u_order[k];
+            print u "|" u_ips[u] "|" u_inbounds[u];
+        }
     }
-    ' "$log_file" | while IFS='|' read -r u i ib; do
+    ' "$log_file" | while IFS='|' read -r u i_list ib_list; do
         [ -z "$u" ] && continue
-        local user_json="$json_dir/${u}.json"
         local current_time
         current_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         
-        if [ ! -f "$user_json" ]; then
-            echo '{"user": "'"$u"'", "connections": []}' > "$user_json"
-        fi
-        
-        jq --arg ip "$i" --arg inbound "$ib" --arg time "$current_time" \
-           '.connections += [{"ip": $ip, "inbound": $inbound, "time": $time}]' \
-           "$user_json" > "${user_json}.tmp" && mv "${user_json}.tmp" "$user_json"
+        jq --arg user "$u" --arg ips "$i_list" --arg inbounds "$ib_list" --arg time "$current_time" \
+           '
+           (.connections // []) as $conns |
+           ($conns | map(.user == $user) | index(true)) as $idx |
+           if $idx == null then
+             .connections += [{"user": $user, "ip": $ips, "inbound": $inbounds, "time": $time}]
+           else
+             .connections[$idx] |= (
+               .time = $time |
+               .ip = ([ (.ip | split(", ")[]), ($ips | split(", ")[]) ] | unique | join(", ")) |
+               .inbound = ([ (.inbound | split(", ")[]), ($inbounds | split(", ")[]) ] | unique | join(", "))
+             )
+           end
+           ' "$shared_json" > "${shared_json}.tmp" && mv "${shared_json}.tmp" "$shared_json"
     done
 
     > "$log_file"
