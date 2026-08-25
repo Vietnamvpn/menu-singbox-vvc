@@ -680,7 +680,7 @@ parse_singbox_logs() {
     
     if [ ! -f "$log_file" ] || [ ! -s "$log_file" ]; then
         return 0
-    }
+    fi
 
     mkdir -p "$json_dir"
 
@@ -734,13 +734,15 @@ parse_singbox_logs() {
     ' "$log_file" | while IFS='|' read -r u i ib; do
         [ -z "$u" ] && continue
         local user_json="$json_dir/${u}.json"
+        local current_time
+        current_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         
         if [ ! -f "$user_json" ]; then
             echo '{"user": "'"$u"'", "connections": []}' > "$user_json"
         fi
         
-        jq --arg ip "$i" --arg inbound "$ib" \
-           '.connections += [{"ip": $ip, "inbound": $inbound, "time": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}]' \
+        jq --arg ip "$i" --arg inbound "$ib" --arg time "$current_time" \
+           '.connections += [{"ip": $ip, "inbound": $inbound, "time": $time}]' \
            "$user_json" > "${user_json}.tmp" && mv "${user_json}.tmp" "$user_json"
     done
 
