@@ -403,6 +403,21 @@ extract_json_block() {
     fi
 }
 
+# Sửa config.json để sing-box xuất log ra file theo mức info
+set_singbox_log() {
+    local config_file="$1"
+    local log_dir="/opt/menu-singbox-vvc/logs"
+    local log_file="${log_dir}/sing-box.log"
+
+    if [ ! -d "$log_dir" ]; then
+        mkdir -p "$log_dir"
+    fi
+
+    if [ -f "$config_file" ]; then
+        jq --arg log_output "$log_file" '.log.level = "info" | .log.output = $log_output' "$config_file" > "${config_file}.tmp" && mv "${config_file}.tmp" "$config_file"
+    fi
+}
+
 # ==========================================
 # HÀM BIÊN DỊCH VÀ ÁP DỤNG CẤU HÌNH (BUILD)
 # ==========================================
