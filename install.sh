@@ -45,6 +45,29 @@ else
     log_error "Hệ điều hành không được hỗ trợ chính thức: $OS"
 fi
 
+# Tự động kiểm tra và cài đặt grpcurl
+if ! command -v grpcurl >/dev/null 2>&1; then
+    log_info "Đang kiểm tra và cài đặt grpcurl..."
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64) GRPCURL_ARCH="x86_64" ;;
+        aarch64|arm64) GRPCURL_ARCH="arm64" ;;
+        *) GRPCURL_ARCH="x86_64" ;;
+    esac
+    GRPCURL_VER="1.9.2"
+    if wget -q "https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VER}/grpcurl_${GRPCURL_VER}_linux_${GRPCURL_ARCH}.tar.gz" -O /tmp/grpcurl.tar.gz 2>/dev/null || \
+       curl -sL "https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VER}/grpcurl_${GRPCURL_VER}_linux_${GRPCURL_ARCH}.tar.gz" -o /tmp/grpcurl.tar.gz; then
+        tar -zxf /tmp/grpcurl.tar.gz -C /usr/local/bin grpcurl 2>/dev/null || true
+        chmod +x /usr/local/bin/grpcurl 2>/dev/null || true
+        rm -f /tmp/grpcurl.tar.gz
+    fi
+    if command -v grpcurl >/dev/null 2>&1; then
+        log_success "Cài đặt grpcurl thành công."
+    else
+        log_warn "Không thể cài đặt grpcurl tự động, hệ thống sẽ sử dụng apt/yum fallback khi chạy daemon."
+    fi
+fi
+
 log_success "Cập nhật và cài đặt thư viện hệ thống hoàn tất."
 
 # 3. Thiết lập Tường lửa (Firewall)
@@ -96,7 +119,6 @@ log_info "Khởi tạo các tệp dữ liệu tĩnh..."
 [ ! -s "$INSTALL_DIR/data/routing.json" ] && echo "[]" > "$INSTALL_DIR/data/routing.json"
 [ ! -s "$INSTALL_DIR/data/domain.json" ] && echo "[]" > "$INSTALL_DIR/data/domain.json"
 [ ! -s "$INSTALL_DIR/data/entry-node.json" ] && echo "[]" > "$INSTALL_DIR/data/entry-node.json"
-[ ! -s "$INSTALL_DIR/data/local_state.json" ] && echo "{}" > "$INSTALL_DIR/data/local_state.json"
 
 # 6. Khởi tạo Chứng chỉ SSL tạm thời (Self-Signed) khi chưa xin từ Cloudflare
 if [ ! -f "$INSTALL_DIR/certs/default/cert.pem" ]; then
@@ -108,8 +130,8 @@ if [ ! -f "$INSTALL_DIR/certs/default/cert.pem" ]; then
     log_success "Tạo chứng chỉ SSL mặc định thành công."
 fi
 
-# 7. Tải và Cài đặt Sing-box Core phiên bản tùy chỉnh từ Vietnamvpn/sing-box (v1.13.14)
-log_info "Đang tải phiên bản Sing-box Core v1.13.14 từ Vietnamvpn/sing-box..."
+# 7. Tải và Cài đặt Sing-box Core phiên bản mới nhất từ Vietnamvpn/sing-box
+log_info "Đang kiểm tra phiên bản Sing-box Core mới nhất từ Vietnamvpn/sing-box..."
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64) SINGBOX_ARCH="amd64" ;;
@@ -117,7 +139,12 @@ case "$ARCH" in
     *) log_error "Kiến trúc CPU không được hỗ trợ: $ARCH" ;;
 esac
 
-VERSION="v1.13.14"
+VERSION=$(curl -s "https://api.github.com/repos/Vietnamvpn/sing-box/releases/latest" | jq -r '.tag_name // empty')
+if [ -z "$VERSION" ]; then
+    log_warn "Không thể lấy phiên bản mới nhất từ GitHub API, chuyển sang dùng phiên bản dự phòng v1.13.14"
+    VERSION="v1.13.14"
+fi
+
 DOWNLOAD_URL="https://github.com/Vietnamvpn/sing-box/releases/download/${VERSION}/sing-box-linux-${SINGBOX_ARCH}"
 
 log_info "Đang tải xuống Sing-box ${VERSION} (${SINGBOX_ARCH})..."
@@ -158,6 +185,6 @@ ln -sf "$INSTALL_DIR/main.sh" /usr/local/bin/vvc
 chmod +x /usr/local/bin/vvc
 
 log_success "=================================================="
-log_success " LẮP ĐẶT HOÀN TẤT HỆ THỐNG MENU SINGBOX VVC"
-log_success " Gõ lệnh: vvc để truy cập Menu Quản Lý"
+log_success "${GREEN} LẮP ĐẶT HOÀN TẤT HỆ THỐNG MENU SINGBOX VVC${NC}"
+echo -e "${YELLOW} Gõ lệnh: vvc để truy cập Menu Quản Lý${NC}"
 log_success "=================================================="
