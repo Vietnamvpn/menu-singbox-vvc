@@ -683,12 +683,10 @@ parse_singbox_logs() {
     fi
 
     mkdir -p "$(dirname "$shared_json")"
-    
-    if [ ! -f "$shared_json" ]; then
-        echo '{"connections": []}' > "$shared_json"
-    fi
 
-    awk '
+    # Trích xuất dữ liệu mới nhất từ file log hiện tại
+    local parsed_data
+    parsed_data=$(awk '
     {
         cid = "";
         for(i=1; i<=NF; i++) {
@@ -710,6 +708,8 @@ parse_singbox_logs() {
                 if ($i == "from") {
                     ip_port = $(i+1);
                     sub(/:[0-9]+$/, "", ip_port);
+                    gsub(/^\[::ffff:/, "", ip_port);
+                    gsub(/\]$/, "", ip_port);
                     ip[cid] = ip_port;
                 }
             }
@@ -735,14 +735,9 @@ parse_singbox_logs() {
                     seen[u] = 1;
                     u_order[++cnt] = u;
                 }
-                if (index(u_ips[u], i) == 0) {
-                    if (u_ips[u] == "") u_ips[u] = i;
-                    else u_ips[u] = u_ips[u] ", " i;
-                }
-                if (index(u_inbounds[u], ib) == 0) {
-                    if (u_inbounds[u] == "") u_inbounds[u] = ib;
-                    else u_inbounds[u] = u_inbounds[u] ", " ib;
-                }
+                # Ghi đè bằng kết nối mới nhất trong log
+                u_ips[u] = i;
+                u_inbounds[u] = ib;
             }
         }
         for (k=1; k<=cnt; k++) {
@@ -750,26 +745,27 @@ parse_singbox_logs() {
             print u "|" u_ips[u] "|" u_inbounds[u];
         }
     }
-    ' "$log_file" | while IFS='|' read -r u i_list ib_list; do
+    ' "$log_file")
+
+    if [ -z "$parsed_data" ]; then
+        > "$log_file"
+        return 0
+    fi
+
+    local current_time
+    current_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    # Khởi tạo lại file JSON sạch sẽ (không cộng dồn rác cũ)
+    echo '{"connections": []}' > "$shared_json"
+
+    # Ghi danh sách mới vào file
+    echo "$parsed_data" | while IFS='|' read -r u i ib; do
         [ -z "$u" ] && continue
-        local current_time
-        current_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        
-        jq --arg user "$u" --arg ips "$i_list" --arg inbounds "$ib_list" --arg time "$current_time" \
-           '
-           (.connections // []) as $conns |
-           ($conns | map(.user == $user) | index(true)) as $idx |
-           if $idx == null then
-             .connections += [{"user": $user, "ip": $ips, "inbound": $inbounds, "time": $time}]
-           else
-             .connections[$idx] |= (
-               .time = $time |
-               .ip = ([ (.ip | split(", ")[]), ($ips | split(", ")[]) ] | unique | join(", ")) |
-               .inbound = ([ (.inbound | split(", ")[]), ($inbounds | split(", ")[]) ] | unique | join(", "))
-             )
-           end
-           ' "$shared_json" > "${shared_json}.tmp" && mv "${shared_json}.tmp" "$shared_json"
+        jq --arg user "$u" --arg ip "$i" --arg inbound "$ib" --arg time "$current_time" \
+           '.connections += [{"user": $user, "ip": $ip, "inbound": $inbound, "time": $time}]' \
+           "$shared_json" > "${shared_json}.tmp" && mv "${shared_json}.tmp" "$shared_json"
     done
 
+    # Xóa log cũ sau khi đã bóc tách xong
     > "$log_file"
 }
