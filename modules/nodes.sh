@@ -750,6 +750,16 @@ update_node() {
         fi
     fi
 
+    read -p " Bạn có muốn cập nhật/chọn lại Chứng chỉ SSL không? (y/n): " update_ssl
+    if [[ "$update_ssl" =~ ^[Yy]$ ]]; then
+        ask_cert
+        if [ -n "$ASKED_CERT" ] && [ -n "$ASKED_KEY" ]; then
+            jq --arg tag "$node_tag" --arg cert "$ASKED_CERT" --arg key "$ASKED_KEY" \
+               '(.[] | select(.tag == $tag).cert_path) = $cert | (.[] | select(.tag == $tag).key_path) = $key' "$NODES_FILE" > "$NODES_FILE.tmp" && mv "$NODES_FILE.tmp" "$NODES_FILE"
+            echo -e "${GREEN} -> Cập nhật Chứng chỉ SSL thành công.${NC}"
+        fi
+    fi
+
     echo -e "${GREEN}Cập nhật Node hoàn tất!${NC}"
     build_and_apply_config
     sleep 2
