@@ -528,19 +528,25 @@ ADDED_NODE_TAGS=()
 
 handle_node_user_assignment_and_build() {
     if [ ! -s "$USERS_FILE" ] || [ "$(cat "$USERS_FILE")" = "[]" ]; then
-        echo -e "${YELLOW}Hệ thống chưa có user nào. Đang tự động tạo user mặc định 'admin'...${NC}"
-        local admin_secret=""
+        echo -e "${YELLOW}Hệ thống chưa có user nào. Đang tự động tạo user mặc định 'admin1'...${NC}"
+        local admin_uuid=""
+        
+        # Tự động tạo UUID chuẩn
         if command -v uuidgen >/dev/null 2>&1; then
-            admin_secret=$(uuidgen)
+            admin_uuid=$(uuidgen)
         else
-            admin_secret=$(cat /proc/sys/kernel/random/uuid)
+            admin_uuid=$(cat /proc/sys/kernel/random/uuid)
         fi
-        jq --arg username "admin" \
+        
+        # Dùng jq để xuất ra JSON đúng định dạng 4 trường yêu cầu
+        jq --arg username "admin1" \
            --arg tag "all" \
-           --arg secret "$admin_secret" \
-           '[{"username": $username, "tag": $tag, "secret": $secret}]' \
+           --arg uuid "$admin_uuid" \
+           --arg status "active" \
+           '[{"username": $username, "tag": $tag, "uuid": $uuid, "status": $status}]' \
            "$USERS_FILE" > "$USERS_FILE.tmp" && mv "$USERS_FILE.tmp" "$USERS_FILE"
-        echo -e "${GREEN} -> Đã tạo user 'admin' thành công (UUID: $admin_secret).${NC}"
+           
+        echo -e "${GREEN} -> Đã tạo user 'admin1' thành công (UUID: $admin_uuid).${NC}"
     fi
 
     clear
