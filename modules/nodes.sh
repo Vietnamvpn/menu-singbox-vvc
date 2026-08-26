@@ -221,7 +221,7 @@ ask_cert() {
     echo -e "${CYAN}================================================================${NC}"
     for i in "${!cert_list[@]}"; do
         echo -e " ${GREEN}$((i + 1)).${NC} Cert: ${cert_list[$i]}"
-        echo -e "     Key:  ${key_list[$i]}"
+        echo -e "    Key: ${key_list[$i]}"
     done
     echo -e " ${GREEN}0.${NC} Tự nhập đường dẫn thủ công"
     echo -e "${CYAN}================================================================${NC}"
