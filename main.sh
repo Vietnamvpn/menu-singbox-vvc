@@ -98,7 +98,7 @@ show_menu() {
     echo -e " ${GREEN}4.${NC} Quản Lý Chứng Chỉ SSL     ${CYAN}│${NC}  ${RED}9.${NC} Gỡ Bỏ Hoàn Toàn"
     echo -e " ${GREEN}5.${NC} Quản Lý Sing Box          ${CYAN}│${NC}  ${RED}0.${NC} Thoát Khỏi Menu"
     echo -e "${CYAN}================================================================${NC}"
-    read -p " Vui lòng chọn một chức năng [0-9]: " choice
+    read -p "Vui lòng chọn một chức năng [0-9]: " choice
 
     case $choice in
         1)
@@ -180,7 +180,7 @@ show_menu() {
             ;;
         0)
             clear
-            echo -e "${BLUE}Cảm ơn bạn đã sử dụng VVC. Hẹn gặp lại!${NC}"
+            echo -e "${YELLOW}Cảm ơn bạn đã sử MENU QUẢN LÝ SING BOX. Hẹn gặp lại!${NC}"
             exit 0
             ;;
         *)
