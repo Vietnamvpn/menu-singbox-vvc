@@ -671,7 +671,7 @@ list_nodes() {
                 echo -e "    Domain: ${BLUE}$domain${NC} │ SNI: ${BLUE}$sni${NC}"
                 echo -e "${CYAN}----------------------------------------------------------------${NC}"
                 i=$((i + 1))
-            done < <(jq -r '.[] | "\(.tag) \(.type) \(.port) \(.domain // "N/A") \(.sni // "N/A")"' "$NODES_FILE")
+            done < <(jq -r '.[] | "\(.tag) \(.type) \(.port) \(.domain // "N/A") \(.sni // .domain // "N/A")"' "$NODES_FILE")
         else
             cat "$NODES_FILE"
         fi
