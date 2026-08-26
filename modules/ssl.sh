@@ -95,16 +95,16 @@ request_cloudflare_ssl() {
         fi
     fi
 
-    # Đăng ký tài khoản acme.sh mặc định nếu chưa có
-    "$HOME/.acme.sh/acme.sh" --register-account -m "$cf_email" > /dev/null 2>&1
+    # Đăng ký tài khoản acme.sh mặc định với Let's Encrypt nếu chưa có
+    "$HOME/.acme.sh/acme.sh" --register-account -m "$cf_email" --server letsencrypt > /dev/null 2>&1
 
     export CF_Email="$cf_email"
     export CF_Key="$cf_key"
 
     echo -e "${INFO} Đang tiến hành yêu cầu cấp chứng chỉ qua Cloudflare DNS API cho miền: $domain và *.$domain..."
     
-    # Xin chứng chỉ cho cả domain chính và wildcard
-    "$HOME/.acme.sh/acme.sh" --issue --dns dns_cf -d "$domain" -d "*.$domain" --keylength ec-256
+    # Xin chứng chỉ cho cả domain chính và wildcard (Chuyển CA sang Let's Encrypt)
+    "$HOME/.acme.sh/acme.sh" --issue --dns dns_cf -d "$domain" -d "*.$domain" --keylength ec-256 --server letsencrypt
 
     if [ $? -eq 0 ]; then
         echo -e "${SUCCESS} Xin chứng chỉ thành công! Đang tiến hành cài đặt chứng chỉ..."
