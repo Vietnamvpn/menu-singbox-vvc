@@ -178,59 +178,14 @@ ask_cert() {
     local cert_list=()
     local key_list=()
     
-    # Thêm chứng chỉ mặc định của hệ thống
+    # 1. Thêm chứng chỉ mặc định của hệ thống
     cert_list+=("$INSTALL_DIR/certs/default/cert.pem")
     key_list+=("$INSTALL_DIR/certs/default/private.key")
     
-    # Tìm kiếm các chứng chỉ khác trong thư mục $INSTALL_DIR/certs
-    if [ -d "$INSTALL_DIR/certs" ]; then
-        while IFS= read -r cert_file; do
-            if [[ "$cert_file" != *"default"* ]] && [[ -f "$cert_file" ]]; then
-                local dir_name
-                dir_name=$(dirname "$cert_file")
-                for k_file in "$dir_name"/*.key "$dir_name"/*.pem; do
-                    if [[ "$k_file" == *.key ]] && [[ -f "$k_file" ]]; then
-                        cert_list+=("$cert_file")
-                        key_list+=("$k_file")
-                        break
-                    fi
-                done
-            fi
-        done < <(find "$INSTALL_DIR/certs" -type f \( -name "*.pem" -o -name "*.crt" -o -name "*.cer" \) 2>/dev/null)
-    fi
-
-    # Tìm kiếm chứng chỉ trong thư mục /etc/sing-box/certs
-    if [ -d "/etc/sing-box/certs" ]; then
-        while IFS= read -r cert_file; do
-            if [[ -f "$cert_file" ]]; then
-                local dir_name
-                dir_name=$(dirname "$cert_file")
-                for k_file in "$dir_name"/*.key; do
-                    if [[ -f "$k_file" ]]; then
-                        cert_list+=("$cert_file")
-                        key_list+=("$k_file")
-                        break
-                    fi
-                done
-            fi
-        done < <(find "/etc/sing-box/certs" -type f \( -name "fullchain.pem" -o -name "*.crt" -o -name "*.cer" \) 2>/dev/null)
-    fi
-    
-    # Tìm kiếm trong thư mục acme.sh nếu có
-    if [ -d "/root/.acme.sh" ]; then
-        while IFS= read -r cert_file; do
-            if [[ -f "$cert_file" ]]; then
-                local dir_name
-                dir_name=$(dirname "$cert_file")
-                for k_file in "$dir_name"/*.key; do
-                    if [[ -f "$k_file" ]]; then
-                        cert_list+=("$cert_file")
-                        key_list+=("$k_file")
-                        break
-                    fi
-                done
-            fi
-        done < <(find "/root/.acme.sh" -maxdepth 2 -name "fullchain.cer" -o -name "*.cer" 2>/dev/null)
+    # 2. Chỉ kiểm tra và lấy file chứng chỉ chuẩn trong /etc/sing-box/certs
+    if [ -f "/etc/sing-box/certs/fullchain.pem" ] && [ -f "/etc/sing-box/certs/private.key" ]; then
+        cert_list+=("/etc/sing-box/certs/fullchain.pem")
+        key_list+=("/etc/sing-box/certs/private.key")
     fi
 
     echo -e "${CYAN}================================================================${NC}"
