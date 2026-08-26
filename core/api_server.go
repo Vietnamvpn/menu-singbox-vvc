@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -472,6 +473,51 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 				}
 			}
 		}()
+
+		// [ĐÃ SỬA VỊ TRÍ]: Luồng tự động quét và báo cáo trạng thái inbound lên web được đặt bên trong vòng lặp ticker
+		func() {
+			data, err := os.ReadFile(nodesFile)
+			if err != nil {
+				return
+			}
+			var nodes []Node
+			if json.Unmarshal(data, &nodes) != nil || len(nodes) == 0 {
+				return
+			}
+
+			var inboundsList []map[string]interface{}
+			for _, n := range nodes {
+				if n.Port <= 0 {
+					continue
+				}
+				status := checkInboundStatus(n)
+
+				inboundMap := map[string]interface{}{
+					"type":           n.Type,
+					"tag":            n.Tag,
+					"port":           n.Port,
+					"domain":         n.Domain,
+					"address":        n.Address,
+					"sni":            n.SNI,
+					"public_key":     n.PublicKey,
+					"short_id":       n.ShortID,
+					"ws_path":        n.WSPath,
+					"grpc_service":   n.GRPCService,
+					"password":       n.Password,
+					"inbound_status": status,
+				}
+				inboundsList = append(inboundsList, inboundMap)
+			}
+
+			if len(inboundsList) > 0 {
+				log.Printf("[INBOUND REPORT] Đang gửi trạng thái của %d inbound lên web", len(inboundsList))
+				if apiErr := sendApiRequest("report_inbounds", map[string]interface{}{"inbounds": inboundsList}, nil); apiErr != nil {
+					log.Printf("[INBOUND API LỖI] Không thể gửi trạng thái inbound lên web: %v", apiErr)
+				} else {
+					log.Printf("[INBOUND API THÀNH CÔNG] Đã đẩy trạng thái inbound lên web.")
+				}
+			}
+		}()
 	}
 }
 
@@ -796,4 +842,33 @@ func generateRandomString(n int) string {
 		b[i] = letters[x%byte(len(letters))]
 	}
 	return string(b)
+}
+
+// Kiểm tra xem service sing-box có đang chạy hay không
+func isSingboxRunning() bool {
+	cmd := exec.Command("systemctl", "is-active", "--quiet", "sing-box")
+	return cmd.Run() == nil
+}
+
+// Hàm kiểm tra trạng thái inbound thông minh (Hỗ trợ cả TCP và UDP)
+func checkInboundStatus(n Node) string {
+	// Nếu dịch vụ sing-box không chạy, tất cả đều offline
+	if !isSingboxRunning() {
+		return "offline"
+	}
+
+	nodeType := strings.ToLower(n.Type)
+	// Đối với các giao thức chạy UDP (Hysteria2, TUIC), miễn là sing-box đang chạy thì là online
+	if strings.Contains(nodeType, "hysteria") || strings.Contains(nodeType, "tuic") {
+		return "online"
+	}
+
+	// Đối với các giao thức TCP, tiến hành quét port thực tế
+	target := fmt.Sprintf("127.0.0.1:%d", n.Port)
+	conn, err := net.DialTimeout("tcp", target, 2*time.Second)
+	if err != nil {
+		return "offline"
+	}
+	conn.Close()
+	return "online"
 }
