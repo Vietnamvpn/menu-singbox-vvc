@@ -182,7 +182,7 @@ ask_cert() {
     cert_list+=("$INSTALL_DIR/certs/default/cert.pem")
     key_list+=("$INSTALL_DIR/certs/default/private.key")
     
-    # Tìm kiếm các chứng chỉ khác trong thư mục certs
+    # Tìm kiếm các chứng chỉ khác trong thư mục $INSTALL_DIR/certs
     if [ -d "$INSTALL_DIR/certs" ]; then
         while IFS= read -r cert_file; do
             if [[ "$cert_file" != *"default"* ]] && [[ -f "$cert_file" ]]; then
@@ -197,6 +197,23 @@ ask_cert() {
                 done
             fi
         done < <(find "$INSTALL_DIR/certs" -type f \( -name "*.pem" -o -name "*.crt" -o -name "*.cer" \) 2>/dev/null)
+    fi
+
+    # Tìm kiếm chứng chỉ trong thư mục /etc/sing-box/certs
+    if [ -d "/etc/sing-box/certs" ]; then
+        while IFS= read -r cert_file; do
+            if [[ -f "$cert_file" ]]; then
+                local dir_name
+                dir_name=$(dirname "$cert_file")
+                for k_file in "$dir_name"/*.key; do
+                    if [[ -f "$k_file" ]]; then
+                        cert_list+=("$cert_file")
+                        key_list+=("$k_file")
+                        break
+                    fi
+                done
+            fi
+        done < <(find "/etc/sing-box/certs" -type f \( -name "fullchain.pem" -o -name "*.crt" -o -name "*.cer" \) 2>/dev/null)
     fi
     
     # Tìm kiếm trong thư mục acme.sh nếu có
