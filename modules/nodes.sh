@@ -738,7 +738,7 @@ update_node() {
         fi
     fi
 
-    echo -e "${GREEN}Cập nhật Node hoàn tất!${NC}"
+    echo -e "${YELLOW}Cập nhật Node hoàn tất!${NC}"
     build_and_apply_config
     sleep 2
 }
