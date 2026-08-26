@@ -187,7 +187,7 @@ test_api_connection() {
     read -p "Nhấn Enter để tiếp tục..."
 }
 
-# Gửi thủ công thông tin / link node lên Web Trung Tâm
+# Gửi thủ công thông tin / link node lên Web Trung Tâm kèm trạng thái
 send_manual_links() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
     echo -e "${YELLOW} GỬI THÔNG TIN / LINK NODE THỦ CÔNG${NC}"
@@ -228,49 +228,80 @@ send_manual_links() {
         return
     fi
 
-    log_info "Đang chuẩn bị dữ liệu inbound để gửi lên web..."
+    log_info "Đang kiểm tra trạng thái và chuẩn bị dữ liệu inbound để gửi lên web..."
 
-    local payload_json
-    payload_json=$(jq -n \
+    # 1. Tạo mảng inbounds cơ bản từ nodes và entry nodes
+    local base_inbounds
+    base_inbounds=$(jq -n \
         --argjson nodes "$(cat "$nodes_file")" \
         --argjson entries "$([ -f "$entry_file" ] && cat "$entry_file" || echo "[]")" \
-        '{
-            action: "report_inbounds",
-            inbounds: [
-                $nodes[] as $n |
-                ($entries | map(select(.node_tag == $n.tag))) as $matched_entries |
-                if ($matched_entries | length) > 0 then
-                    $matched_entries[] as $entry |
-                    {
-                        type: $n.type,
-                        tag: $n.tag,
-                        domain: ($entry.address // $n.domain // $n.address),
-                        address: $entry.address,
-                        port: $entry.port,
-                        sni: $n.sni,
-                        public_key: $n.public_key,
-                        short_id: $n.short_id,
-                        ws_path: $n.ws_path,
-                        grpc_service: $n.grpc_service,
-                        password: $n.password
-                    }
-                else
-                    {
-                        type: $n.type,
-                        tag: $n.tag,
-                        domain: ($n.domain // $n.address // "VPS_IP_OR_DOMAIN"),
-                        address: $n.address,
-                        port: $n.port,
-                        sni: $n.sni,
-                        public_key: $n.public_key,
-                        short_id: $n.short_id,
-                        ws_path: $n.ws_path,
-                        grpc_service: $n.grpc_service,
-                        password: $n.password
-                    }
-                end
-            ]
-        }')
+        '[
+            $nodes[] as $n |
+            ($entries | map(select(.node_tag == $n.tag))) as $matched_entries |
+            if ($matched_entries | length) > 0 then
+                $matched_entries[] as $entry |
+                {
+                    type: $n.type,
+                    tag: $n.tag,
+                    domain: ($entry.address // $n.domain // $n.address),
+                    address: $entry.address,
+                    port: $entry.port,
+                    sni: $n.sni,
+                    public_key: $n.public_key,
+                    short_id: $n.short_id,
+                    ws_path: $n.ws_path,
+                    grpc_service: $n.grpc_service,
+                    password: $n.password
+                }
+            else
+                {
+                    type: $n.type,
+                    tag: $n.tag,
+                    domain: ($n.domain // $n.address // "VPS_IP_OR_DOMAIN"),
+                    address: $n.address,
+                    port: $n.port,
+                    sni: $n.sni,
+                    public_key: $n.public_key,
+                    short_id: $n.short_id,
+                    ws_path: $n.ws_path,
+                    grpc_service: $n.grpc_service,
+                    password: $n.password
+                }
+            end
+        ]')
+
+    # 2. Duyệt qua từng inbound để kiểm tra trạng thái thực tế (online/offline)
+    local count=$(echo "$base_inbounds" | jq 'length')
+    local updated_inbounds="[]"
+    
+    local sb_is_running="false"
+    if systemctl is-active --quiet sing-box; then
+        sb_is_running="true"
+    fi
+
+    for ((i=0; i<count; i++)); do
+        local item=$(echo "$base_inbounds" | jq --argjson idx "$i" '.[$idx]')
+        local n_type=$(echo "$item" | jq -r '.type')
+        local n_port=$(echo "$item" | jq -r '.port')
+        
+        local status="offline"
+        if [ "$sb_is_running" = "true" ]; then
+            local l_type=$(echo "$n_type" | tr '[:upper:]' '[:lower:]')
+            if [[ "$l_type" == *hysteria* ]] || [[ "$l_type" == *tuic* ]]; then
+                status="online"
+            elif [ -n "$n_port" ] && [ "$n_port" -gt 0 ]; then
+                if timeout 2 bash -c "(: </dev/tcp/127.0.0.1/$n_port) >/dev/null 2>&1"; then
+                    status="online"
+                fi
+            fi
+        fi
+        
+        item=$(echo "$item" | jq --arg st "$status" '. + {inbound_status: $st}')
+        updated_inbounds=$(echo "$updated_inbounds" | jq --argjson it "$item" '. + [$it]')
+    done
+
+    local payload_json
+    payload_json=$(jq -n --argjson inbounds "$updated_inbounds" '{action: "report_inbounds", inbounds: $inbounds}')
 
     local response
     response=$(curl -s -w "\n%{http_code}" \
@@ -285,7 +316,7 @@ send_manual_links() {
     body=$(echo "$response" | head -n -1)
 
     if [ "$http_code" = "200" ]; then
-        log_success "Đã gửi thông tin / link node thủ công lên Web Trung Tâm thành công!"
+        log_success "Đã gửi thông tin, link node kèm trạng thái thủ công lên Web Trung Tâm thành công!"
     else
         log_warn "Gửi thất bại (HTTP Code: $http_code). Phản hồi: $body"
     fi
