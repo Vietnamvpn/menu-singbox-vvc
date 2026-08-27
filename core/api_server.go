@@ -479,9 +479,14 @@ func executeTask(task Task) bool {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 	//--------------------------
-	// Ghi debug task vào file debug_task.json để kiểm tra payload
+	// Ghi debug task vào file debug_task.json để kiểm tra payload (lưu cộng dồn dạng mảng JSON)
 	debugFile := filepath.Join(LogDir, "debug_task.json")
-	if debugData, err := json.MarshalIndent(task, "", "  "); err == nil {
+	var tasks []Task
+	if fileData, err := os.ReadFile(debugFile); err == nil {
+		_ = json.Unmarshal(fileData, &tasks)
+	}
+	tasks = append(tasks, task)
+	if debugData, err := json.MarshalIndent(tasks, "", "  "); err == nil {
 		_ = os.WriteFile(debugFile, debugData, 0644)
 	}
 	//--------------------------
