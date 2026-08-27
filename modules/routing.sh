@@ -94,9 +94,10 @@ add_routing_rule() {
     local node_count
     node_count=$(jq length "$NODES_FILE")
     for ((i=0; i<node_count; i++)); do
-        local tag
+        local tag type
         tag=$(jq -r --argjson idx "$i" '.[$idx].tag' "$NODES_FILE")
-        echo -e " ${GREEN}$((i+1)).${NC} $tag"
+        type=$(jq -r --argjson idx "$i" '.[$idx].type // "N/A"' "$NODES_FILE")
+        echo -e " ${GREEN}$((i+1)).${NC} $tag ${YELLOW}[$type]${NC}"
     done
     echo -e "${CYAN}--------------------------------------------------${NC}"
     read -p "Chọn số thứ tự của Inbound cần chuyển tiếp: " in_idx_input
@@ -197,9 +198,10 @@ edit_routing_rule() {
     local node_count
     node_count=$(jq length "$NODES_FILE")
     for ((i=0; i<node_count; i++)); do
-        local tag
+        local tag type
         tag=$(jq -r --argjson idx "$i" '.[$idx].tag' "$NODES_FILE")
-        echo -e " ${GREEN}$((i+1)).${NC} $tag"
+        type=$(jq -r --argjson idx "$i" '.[$idx].type // "N/A"' "$NODES_FILE")
+        echo -e " ${GREEN}$((i+1)).${NC} $tag ${YELLOW}[$type]${NC}"
     done
     echo -e "${CYAN}--------------------------------------------------${NC}"
     read -p "Chọn số thứ tự Inbound mới [Nhấn Enter để giữ nguyên '$old_in']: " in_idx_input
