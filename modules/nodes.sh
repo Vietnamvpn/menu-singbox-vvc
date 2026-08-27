@@ -523,7 +523,7 @@ handle_node_user_assignment_and_build() {
 
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                     ${YELLOW}CHỌN USER ĐỂ GÁN NODE                      ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                   ${YELLOW}CHỌN USER ĐỂ GÁN NODE                    ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
 
     local user_list=()
@@ -634,7 +634,7 @@ add_node_menu() {
 list_nodes() {
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                    ${YELLOW}DANH SÁCH NODE HIỆN TẠI                  ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                   ${YELLOW}DANH SÁCH NODE HIỆN TẠI                  ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
 
     if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
