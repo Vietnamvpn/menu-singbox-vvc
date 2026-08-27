@@ -187,7 +187,8 @@ update_singbox_core() {
 # Xóa toàn bộ mã nguồn, dịch vụ và cấu hình liên quan
 uninstall_system() {
     check_root
-    log_warn "Cảnh báo: Thao tác này sẽ xóa toàn bộ mã nguồn, dịch vụ và cấu hình hệ thống!"
+    log_warn 
+    echo -e "${RED}Cảnh báo: Thao tác này sẽ xóa toàn bộ mã nguồn, dịch vụ và cấu hình hệ thống!${NC}"
     read -p "Bạn có chắc chắn muốn gỡ bỏ hoàn toàn hệ thống không? (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         log_info "Đang dừng các dịch vụ hệ thống..."
