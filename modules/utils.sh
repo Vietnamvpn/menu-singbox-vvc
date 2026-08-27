@@ -208,10 +208,10 @@ uninstall_system() {
         log_info "Đang xóa thư mục mã nguồn $INSTALL_DIR..."
         if [ -d "$INSTALL_DIR" ]; then
             rm -rf "$INSTALL_DIR"
-            log_success "Đã gỡ bỏ hoàn toàn hệ thống và dọn dẹp dữ liệu thành công."
+            echo -e "${GREEN}[SUCCESS] Đã gỡ bỏ hoàn toàn hệ thống và dọn dẹp dữ liệu thành công.${NC}"
             exit 0
         else
-            log_warn "Thư mục cài đặt không tồn tại hoặc đã được xóa trước đó."
+            echo -e "${YELLOW}[WARN] Thư mục cài đặt không tồn tại hoặc đã được xóa trước đó.${NC}"
             exit 0
         fi
     else
