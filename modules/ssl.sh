@@ -21,7 +21,7 @@ render_ssl_menu() {
         echo -e " ${GREEN}2.${NC} Xem chi tiết chứng chỉ hiện tại"
         echo -e " ${GREEN}3.${NC} Gỡ bỏ chứng chỉ SSL"
         echo -e " ${RED}0.${NC} Quay lại Menu Chính"
-        echo -e "${BLUE}================================================================${NC}"
+        echo -e "${CYAN}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-3]: " choice
 
         case "$choice" in
