@@ -15,8 +15,8 @@ else
 fi
 
 VERSION="${GREEN}v1.0.0${NC}"
-AUTHOR="${PURPLE}VI VAN CANG${NC}"
-WEBSITE="${PURPLE}https://linksub24h.com${NC}"
+AUTHOR="${CYAN}VI VAN CANG${NC}"
+WEBSITE="${CYAN}https://linksub24h.com${NC}"
 
 # Hàm hiển thị Banner và Lời chào gọn gàng
 show_banner() {
