@@ -19,9 +19,9 @@ fi
 
 list_users() {
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                    DANH SÁCH USER HIỆN TẠI                   ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||${NC}                  ${YELLOW}DANH SÁCH USER HIỆN TẠI${NC}                 ${BLUE}||${NC}"
+    echo -e "${BLUE}================================================================${NC}"
     
     if [ ! -s "$USERS_FILE" ] || [ "$(cat "$USERS_FILE")" = "[]" ]; then
         echo -e "${YELLOW}Chưa có user nào được tạo.${NC}"
@@ -174,9 +174,9 @@ show_user_links() {
     fi
 
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                   LINK KẾT NỐI HỆ THỐNG                    ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||${NC}               ${YELLOW}LINK KẾT NỐI HỆ THỐNG${NC}                  ${BLUE}||${NC}"
+    echo -e "${BLUE}================================================================${NC}"
 
     if [ -z "$nodes_to_show" ]; then
         echo -e "${YELLOW}Không tìm thấy node nào phù hợp.${NC}"
@@ -224,10 +224,10 @@ show_user_links() {
 
 add_user() {
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                     THÊM USER MỚI                             ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
-    
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||${NC}                  ${YELLOW}THÊM USER MỚI${NC}                          ${BLUE}||${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+
     if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
         echo -e "${RED}Lỗi: Chưa có node nào trong hệ thống để gán user!${NC}"
         sleep 2
@@ -391,9 +391,9 @@ reset_user_token() {
 
 while true; do
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                     QUẢN LÝ THÔNG TIN USER                   ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||${NC}                ${YELLOW}QUẢN LÝ THÔNG TIN USER${NC}                 ${BLUE}||${NC}"
+    echo -e "${BLUE}================================================================${NC}"
     echo -e " ${GREEN}1.${NC} Xem Danh Sách User & Link"
     echo -e " ${GREEN}2.${NC} Thêm User Mới"
     echo -e " ${GREEN}3.${NC} Xóa User"
