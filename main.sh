@@ -23,7 +23,7 @@ show_banner() {
     clear
     echo -e "${BLUE}================================================================${NC}"
     echo -e "${BLUE}||${NC}                  ${YELLOW}MENU QUẢN LÝ SING BOX${NC}                     ${BLUE}||${NC}"
-    echo -e "${BLUE}\\                     -------------------               //${NC}"
+    echo -e "${BLUE}  ||                     -------------------                  ||${NC}"
     echo -e ""
     echo -e " ${YELLOW}Tác giả:${NC} $AUTHOR | ${YELLOW}Phiên bản:${NC} $VERSION"
     echo -e " ${YELLOW}Trạng thái:${NC} $(get_singbox_status) | ${YELLOW}Website:${NC} $WEBSITE"
