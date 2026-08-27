@@ -366,7 +366,7 @@ form_vless_ws_tls() {
 form_vless_grpc_reality() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${CYAN}||${NC}               ${YELLOW}THÊM NODE: VLESS gRPC REALITY               ${CYAN}||${NC}"
+    echo -e "${CYAN}||${NC}                ${YELLOW}THÊM NODE: VLESS gRPC REALITY                ${CYAN}||${NC}"
     echo -e "${CYAN}================================================================${NC}"
 
     ask_port
