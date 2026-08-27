@@ -13,7 +13,7 @@ render_ssl_menu() {
     while true; do
         clear
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${BLUE}||${NC}                  ${YELLOW}QUẢN LÝ CHỨNG CHỈ SSL (CLOUDFLARE)      ${BLUE}||${NC}"
+        echo -e "${BLUE}||${NC}             ${YELLOW}QUẢN LÝ CHỨNG CHỈ SSL (CLOUDFLARE)             ${BLUE}||${NC}"
         echo -e "${BLUE}================================================================${NC}"
         view_ssl_info_summary
         echo -e "${BLUE}================================================================${NC}"
