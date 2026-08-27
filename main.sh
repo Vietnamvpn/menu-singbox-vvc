@@ -35,7 +35,7 @@ show_routing_menu() {
     while true; do
         clear
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${BLUE}||${NC}                    ${YELLOW}QUẢN LÝ ROUTING & RELAY${NC}                  ${BLUE}||${NC}"
+        echo -e "${BLUE}||${NC}                   ${YELLOW}QUẢN LÝ ROUTING & RELAY${NC}                  ${BLUE}||${NC}"
         echo -e "${BLUE}================================================================${NC}"
         echo -e "${GREEN} 1.${NC} Quản Lý Entry"
         echo -e "${GREEN} 2.${NC} Quản Lý Outbound"
