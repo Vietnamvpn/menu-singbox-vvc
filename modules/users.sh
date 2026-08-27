@@ -392,7 +392,7 @@ reset_user_token() {
 while true; do
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                  ${YELLOW}QUẢN LÝ THÔNG TIN USER${NC}                   ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                   ${YELLOW}QUẢN LÝ THÔNG TIN USER${NC}                   ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
     echo -e " ${GREEN}1.${NC} Xem Danh Sách User & Link"
     echo -e " ${GREEN}2.${NC} Thêm User Mới"
