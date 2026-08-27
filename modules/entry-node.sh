@@ -160,7 +160,7 @@ edit_entry_node() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
     
     if [ ! -s "$ENTRY_NODE_FILE" ] || [ "$(jq length "$ENTRY_NODE_FILE" 2>/dev/null)" -eq 0 ]; then
-        echo -e "${YELLOW}[CẢNH BÁO] Không có entry node nào để sửa.${NC}"
+        echo -e "${YELLOW}[THÔNG BÁO] Không có entry node nào để sửa.${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
