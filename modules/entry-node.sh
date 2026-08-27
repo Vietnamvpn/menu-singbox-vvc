@@ -15,7 +15,7 @@ render_entry_node_menu() {
     while true; do
         clear
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${BLUE}||${NC}                  ${YELLOW}QUẢN LÝ ENTRY NODE (CẤP LINK)           ${BLUE}||${NC}"
+        echo -e "${BLUE}||${NC}                  ${YELLOW}QUẢN LÝ ENTRY NODE (CẤP LINK)             ${BLUE}||${NC}"
         echo -e "${BLUE}================================================================${NC}"
         list_entry_nodes_table
         echo -e "${BLUE}================================================================${NC}"
@@ -23,7 +23,7 @@ render_entry_node_menu() {
         echo -e " ${GREEN}2.${NC} Sửa Entry Node"
         echo -e " ${GREEN}3.${NC} Xóa Entry Node"
         echo -e " ${RED}0.${NC} Quay lại Menu Chính"
-        echo -e "${BLUE}================================================================${NC}"
+        echo -e "${CYAN}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-3]: " choice
 
         case "$choice" in

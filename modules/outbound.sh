@@ -23,7 +23,7 @@ render_outbound_menu() {
         echo -e " ${GREEN}2.${NC} Sửa Link Outbound"
         echo -e " ${GREEN}3.${NC} Xóa Link Outbound"
         echo -e " ${RED}0.${NC} Quay lại Menu Chính"
-        echo -e "${BLUE}================================================================${NC}"
+        echo -e "${CYAN}================================================================${NC}"
         read -p " Vui lòng chọn một chức năng [0-3]: " choice
 
         case "$choice" in
