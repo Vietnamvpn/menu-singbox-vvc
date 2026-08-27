@@ -522,10 +522,10 @@ handle_node_user_assignment_and_build() {
     fi
 
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                    CHỌN USER ĐỂ GÁN NODE                      ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
-    
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||${NC}                     ${YELLOW}CHỌN USER ĐỂ GÁN NODE                      ${BLUE}||${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+
     local user_list=()
     if command -v jq &> /dev/null; then
         local i=1
@@ -572,9 +572,9 @@ add_node_menu() {
     ADDED_NODE_TAGS=()
     while true; do
         clear
-        echo -e "${CYAN}================================================================${NC}"
-        echo -e "${BLUE}                   CHỌN GIAO THỨC CHO NODE                     ${NC}"
-        echo -e "${CYAN}================================================================${NC}"
+        echo -e "${BLUE}================================================================${NC}"
+        echo -e "${BLUE}||${NC}                   ${YELLOW}CHỌN GIAO THỨC CHO NODE${NC}                     ${BLUE}||${NC}"
+        echo -e "${BLUE}================================================================${NC}"
         echo -e " ${GREEN}1.${NC} VLESS REALITY (TCP)"
         echo -e " ${GREEN}2.${NC} VLESS WebSocket TLS"
         echo -e " ${GREEN}3.${NC} VLESS gRPC REALITY"
@@ -633,10 +633,10 @@ add_node_menu() {
 
 list_nodes() {
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                    DANH SÁCH NODE HIỆN TẠI                   ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
-    
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||${NC}                     ${YELLOW}DANH SÁCH NODE HIỆN TẠI                   ${BLUE}||${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+
     if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
         echo -e "${YELLOW}Chưa có node nào được tạo.${NC}"
         echo -e "${CYAN}================================================================${NC}"
@@ -788,9 +788,9 @@ delete_node() {
 # Menu chính của module
 while true; do
     clear
-    echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                     QUẢN LÝ THÔNG TIN NODE                   ${NC}"
-    echo -e "${CYAN}================================================================${NC}"
+    echo -e "${BLUE}================================================================${NC}"
+    echo -e "${BLUE}||${NC}                     ${YELLOW}QUẢN LÝ THÔNG TIN NODE                   ${BLUE}||${NC}"
+    echo -e "${BLUE}================================================================${NC}"
     echo -e " ${GREEN}1.${NC} Hiển thị danh sách Node"
     echo -e " ${GREEN}2.${NC} Thêm Node mới"
     echo -e " ${GREEN}3.${NC} Cập nhật Node"
