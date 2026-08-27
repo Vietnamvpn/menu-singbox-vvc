@@ -14,7 +14,7 @@ else
     exit 1
 fi
 
-VERSION="v1.0.0"
+VERSION="${GREEN}v1.0.0${NC}"
 AUTHOR="VI VAN CANG"
 WEBSITE="https://linksub24h.com"
 
