@@ -20,7 +20,7 @@ fi
 list_users() {
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                  ${YELLOW}DANH SÁCH USER HIỆN TẠI${NC}                 ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                   ${YELLOW}DANH SÁCH USER HIỆN TẠI${NC}                  ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
     
     if [ ! -s "$USERS_FILE" ] || [ "$(cat "$USERS_FILE")" = "[]" ]; then
@@ -175,7 +175,7 @@ show_user_links() {
 
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}               ${YELLOW}LINK KẾT NỐI HỆ THỐNG${NC}                  ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                  ${YELLOW}LINK KẾT NỐI HỆ THỐNG${NC}                    ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
 
     if [ -z "$nodes_to_show" ]; then
@@ -225,7 +225,7 @@ show_user_links() {
 add_user() {
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                  ${YELLOW}THÊM USER MỚI${NC}                          ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                    ${YELLOW}THÊM USER MỚI${NC}                          ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
 
     if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
@@ -392,7 +392,7 @@ reset_user_token() {
 while true; do
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                ${YELLOW}QUẢN LÝ THÔNG TIN USER${NC}                 ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                  ${YELLOW}QUẢN LÝ THÔNG TIN USER${NC}                   ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
     echo -e " ${GREEN}1.${NC} Xem Danh Sách User & Link"
     echo -e " ${GREEN}2.${NC} Thêm User Mới"
