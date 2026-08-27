@@ -573,7 +573,7 @@ add_node_menu() {
     while true; do
         clear
         echo -e "${BLUE}================================================================${NC}"
-        echo -e "${BLUE}||${NC}                   ${YELLOW}CHỌN GIAO THỨC CHO NODE${NC}                     ${BLUE}||${NC}"
+        echo -e "${BLUE}||${NC}                 ${YELLOW}CHỌN GIAO THỨC CHO NODE${NC}                    ${BLUE}||${NC}"
         echo -e "${BLUE}================================================================${NC}"
         echo -e " ${GREEN}1.${NC} VLESS REALITY (TCP)"
         echo -e " ${GREEN}2.${NC} VLESS WebSocket TLS"
@@ -634,7 +634,7 @@ add_node_menu() {
 list_nodes() {
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                     ${YELLOW}DANH SÁCH NODE HIỆN TẠI                   ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                    ${YELLOW}DANH SÁCH NODE HIỆN TẠI                  ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
 
     if [ ! -s "$NODES_FILE" ] || [ "$(cat "$NODES_FILE")" = "[]" ]; then
@@ -789,7 +789,7 @@ delete_node() {
 while true; do
     clear
     echo -e "${BLUE}================================================================${NC}"
-    echo -e "${BLUE}||${NC}                     ${YELLOW}QUẢN LÝ THÔNG TIN NODE                   ${BLUE}||${NC}"
+    echo -e "${BLUE}||${NC}                    ${YELLOW}QUẢN LÝ THÔNG TIN NODE                  ${BLUE}||${NC}"
     echo -e "${BLUE}================================================================${NC}"
     echo -e " ${GREEN}1.${NC} Hiển thị danh sách Node"
     echo -e " ${GREEN}2.${NC} Thêm Node mới"
