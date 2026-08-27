@@ -284,7 +284,7 @@ generate_password() {
 form_vless_reality() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}             THÊM NODE: VLESS REALITY (TCP)                    ${NC}"
+    echo -e "${CYAN}||${NC}             ${YELLOW}THÊM NODE: VLESS REALITY (TCP)                  ${CYAN}||${NC}"
     echo -e "${CYAN}================================================================${NC}"
     
     if [ ! -s "$NODES_FILE" ] || ! jq -e . "$NODES_FILE" >/dev/null 2>&1; then
@@ -328,7 +328,7 @@ form_vless_reality() {
 form_vless_ws_tls() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}             THÊM NODE: VLESS WEBSOCKET TLS                   ${NC}"
+    echo -e "${CYAN}||${NC}             ${YELLOW}THÊM NODE: VLESS WEBSOCKET TLS                 ${CYAN}||${NC}"
     echo -e "${CYAN}================================================================${NC}"
 
     ask_port
@@ -366,7 +366,7 @@ form_vless_ws_tls() {
 form_vless_grpc_reality() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}             THÊM NODE: VLESS gRPC REALITY                    ${NC}"
+    echo -e "${CYAN}||${NC}                ${YELLOW}THÊM NODE: VLESS gRPC REALITY                  ${CYAN}||${NC}"
     echo -e "${CYAN}================================================================${NC}"
 
     ask_port
@@ -411,7 +411,7 @@ form_vless_grpc_reality() {
 form_hy2() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                 THÊM NODE: HYSTERIA 2                         ${NC}"
+    echo -e "${CYAN}||${NC}                 ${YELLOW}THÊM NODE: HYSTERIA 2                       ${CYAN}||${NC}"
     echo -e "${CYAN}================================================================${NC}"
 
     ask_port
@@ -455,7 +455,7 @@ form_hy2() {
 form_tuic() {
     clear
     echo -e "${CYAN}================================================================${NC}"
-    echo -e "${BLUE}                     THÊM NODE: TUIC                           ${NC}"
+    echo -e "${CYAN}||${NC}                 ${YELLOW}THÊM NODE: TUIC${NC}                       ${CYAN}||${NC}"
     echo -e "${CYAN}================================================================${NC}"
 
     ask_port
