@@ -19,7 +19,7 @@ render_outbound_menu() {
         echo -e "${BLUE}================================================================${NC}"
         list_outbounds_table
         echo -e "${BLUE}================================================================${NC}"
-        echo -e " ${GREEN}1.${NC} Thêm Link Outbound"
+        echo -e " ${GREEN}1.${NC} Thêm Outbound (Hỗ trợ Link hoặc ip:port:user:pass)"
         echo -e " ${GREEN}2.${NC} Sửa Link Outbound"
         echo -e " ${GREEN}3.${NC} Xóa Link Outbound"
         echo -e " ${RED}0.${NC} Quay lại Menu Chính"
@@ -72,14 +72,14 @@ list_outbounds_table() {
     echo -e "${CYAN}----------------------------------------------------------------${NC}"
 }
 
-# Thêm outbound từ link chia sẻ (Hỗ trợ giới hạn 3 giao thức: tuic, hy2/hysteria2, vless)
+# Thêm outbound hỗ trợ cả Link chia sẻ và định dạng thô (ip:port:user:pass)
 add_outbound_from_link() {
     echo -e "${CYAN}--------------------------------------------------${NC}"
-    echo -e "${YELLOW} THÊM OUTBOUND TỪ LINK CHIA SẺ${NC}"
+    echo -e "${YELLOW} THÊM OUTBOUND (LINK HOẶC IP:PORT:USER:PASS)${NC}"
     echo -e "${CYAN}--------------------------------------------------${NC}"
-    read -p "Dán link chia sẻ (vless://, hy2://, tuic://): " link
-    if [ -z "$link" ]; then
-        echo -e "${RED}[LỖI] Link không được để trống!${NC}"
+    read -p "Nhập link hoặc thông tin proxy (VD: ip:port:user:pass): " input_data
+    if [ -z "$input_data" ]; then
+        echo -e "${RED}[LỖI] Dữ liệu không được để trống!${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
@@ -91,20 +91,51 @@ import urllib.parse
 import json
 import time
 
-link = sys.argv[1]
+raw_input = sys.argv[1].strip()
 try:
-    parsed = urllib.parse.urlparse(link)
+    # Trường hợp nhập dạng thô: ip:port:user:pass hoặc ip:port
+    if "://" not in raw_input:
+        parts = raw_input.split(":")
+        if len(parts) < 2:
+            print(json.dumps({"error": "Định dạng không hợp lệ. Vui lòng nhập dạng ip:port hoặc ip:port:user:pass"}))
+            sys.exit(0)
+        
+        hostname = parts[0]
+        port = int(parts[1])
+        username = parts[2] if len(parts) > 2 else ""
+        password = parts[3] if len(parts) > 3 else ""
+        
+        tag = f"socks_{int(time.time())}"
+        outbound = {
+            "type": "socks",
+            "tag": tag,
+            "server": hostname,
+            "server_port": port,
+            "version": "5"
+        }
+        if username:
+            outbound["username"] = username
+        if password:
+            outbound["password"] = password
+            
+        print(json.dumps(outbound))
+        sys.exit(0)
+
+    # Trường hợp nhập dạng Link chuẩn (vless://, hy2://, tuic://, socks5://)
+    parsed = urllib.parse.urlparse(raw_input)
     scheme = parsed.scheme.lower()
     
     proto_map = {
         "hy2": "hysteria2",
         "hysteria2": "hysteria2",
         "vless": "vless",
-        "tuic": "tuic"
+        "tuic": "tuic",
+        "socks5": "socks",
+        "socks": "socks"
     }
     out_type = proto_map.get(scheme)
     if not out_type:
-        print(json.dumps({"error": "Hệ thống tạm thời chỉ hỗ trợ 3 giao thức: tuic, hy2, vless"}))
+        print(json.dumps({"error": "Hệ thống chỉ hỗ trợ: tuic, hy2, vless, socks5 hoặc ip:port:user:pass"}))
         sys.exit(0)
     
     tag = ""
@@ -114,9 +145,9 @@ try:
         tag = f"node_{int(time.time())}"
         
     hostname = parsed.hostname
-    port = parsed.port or 443
+    port = parsed.port or (1080 if out_type == "socks" else 443)
     if not hostname:
-        print(json.dumps({"error": "Không thể xác định địa chỉ server từ link"}))
+        print(json.dumps({"error": "Không thể xác định địa chỉ server từ dữ liệu nhập"}))
         sys.exit(0)
         
     query = urllib.parse.parse_qs(parsed.query)
@@ -130,22 +161,18 @@ try:
         "server_port": int(port)
     }
 
-    # Xử lý bóc tách thông tin xác thực an toàn (hỗ trợ mã hóa %3A)
     userinfo = urllib.parse.unquote(parsed.netloc.rsplit("@", 1)[0]) if "@" in parsed.netloc else ""
     
     if out_type == "hysteria2":
         if userinfo:
             outbound["password"] = userinfo
-        
         sni = get_q("sni") or get_q("peer") or hostname
         insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1" or get_q("allowinsecure") == "true"
-        
         outbound["tls"] = {
             "enabled": True,
             "server_name": sni,
             "insecure": insecure
         }
-        
         obfs = get_q("obfs")
         obfs_password = get_q("obfs-password") or get_q("obfs_password")
         if obfs:
@@ -157,7 +184,6 @@ try:
     elif out_type == "vless":
         if userinfo:
             outbound["uuid"] = userinfo
-        
         sni = get_q("sni") or get_q("peer") or hostname
         security = get_q("security", "tls")
         insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1"
@@ -193,7 +219,6 @@ try:
         if flow:
             outbound["flow"] = flow
             
-        # Xử lý transport (grpc, ws)
         net_type = get_q("type", "tcp")
         if net_type == "grpc":
             service_name = get_q("serviceName") or get_q("servicename")
@@ -228,11 +253,21 @@ try:
             "alpn": ["h3"]
         }
         outbound["congestion_control"] = congestion_control
+
+    elif out_type == "socks":
+        outbound["version"] = "5"
+        if userinfo:
+            if ":" in userinfo:
+                username_val, password_val = userinfo.split(":", 1)
+                outbound["username"] = username_val
+                outbound["password"] = password_val
+            else:
+                outbound["username"] = userinfo
             
     print(json.dumps(outbound))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
-' "$link")
+' "$input_data")
 
     if echo "$outbound_json" | jq -e '.error' >/dev/null 2>&1; then
         local err_msg
