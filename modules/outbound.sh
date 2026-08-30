@@ -334,45 +334,214 @@ edit_outbound() {
         return
     fi
 
-    local old_tag old_type old_server old_port
+    local old_tag
     old_tag=$(jq -r --argjson i "$idx" '.[$i].tag' "$OUTBOUND_FILE")
-    old_type=$(jq -r --argjson i "$idx" '.[$i].type' "$OUTBOUND_FILE")
-    old_server=$(jq -r --argjson i "$idx" '.[$i].server // ""' "$OUTBOUND_FILE")
-    old_port=$(jq -r --argjson i "$idx" '.[$i].server_port // .[$i].port // 0' "$OUTBOUND_FILE")
-
+    
     echo -e "Đang sửa Outbound: ${CYAN}$old_tag${NC}"
-    read -p "Nhập Tag mới [Mặc định: $old_tag]: " new_tag
-    new_tag="${new_tag:-$old_tag}"
-
-    if [ "$new_tag" != "$old_tag" ]; then
-        local exists
-        exists=$(jq --arg t "$new_tag" '[.[] | select(.tag == $t)] | length' "$OUTBOUND_FILE")
-        if [ "$exists" -gt 0 ]; then
-            echo -e "${RED}[LỖI] Tag '$new_tag' đã bị trùng với outbound khác!${NC}"
-            read -p "Nhấn Enter để tiếp tục..."
-            return
-        fi
-    fi
-
-    read -p "Nhập Loại mới [Mặc định: $old_type]: " new_type
-    new_type="${new_type:-$old_type}"
-
-    read -p "Nhập Server mới [Mặc định: $old_server]: " new_server
-    new_server="${new_server:-$old_server}"
-
-    read -p "Nhập Cổng mới [Mặc định: $old_port]: " new_port
-    new_port="${new_port:-$old_port}"
-
-    if ! [[ "$new_port" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}[LỖI] Cổng (Port) phải là một số nguyên hợp lệ!${NC}"
+    read -p "Nhập link hoặc thông tin proxy MỚI (VD: ip:port:user:pass): " input_data
+    if [ -z "$input_data" ]; then
+        echo -e "${RED}[LỖI] Dữ liệu không được để trống! Đã hủy thao tác.${NC}"
         read -p "Nhấn Enter để tiếp tục..."
         return
     fi
 
-    jq --argjson i "$idx" --arg t "$new_tag" --arg tp "$new_type" --arg s "$new_server" --argjson p "$new_port" \
-       '.[$i] = {"type": $tp, "tag": $t, "server": $s, "server_port": $p}' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
+    local outbound_json
+    outbound_json=$(python3 -c '
+import sys
+import urllib.parse
+import json
+import time
 
-    log_success "Đã cập nhật outbound thành công!"
+raw_input = sys.argv[1].strip()
+try:
+    if "://" not in raw_input:
+        parts = raw_input.split(":")
+        if len(parts) < 2:
+            print(json.dumps({"error": "Định dạng không hợp lệ. Vui lòng nhập dạng ip:port hoặc ip:port:user:pass"}))
+            sys.exit(0)
+        
+        hostname = parts[0]
+        port = int(parts[1])
+        username = parts[2] if len(parts) > 2 else ""
+        password = parts[3] if len(parts) > 3 else ""
+        
+        tag = f"socks_{int(time.time())}"
+        outbound = {
+            "type": "socks",
+            "tag": tag,
+            "server": hostname,
+            "server_port": port,
+            "version": "5"
+        }
+        if username:
+            outbound["username"] = username
+        if password:
+            outbound["password"] = password
+            
+        print(json.dumps(outbound))
+        sys.exit(0)
+
+    parsed = urllib.parse.urlparse(raw_input)
+    scheme = parsed.scheme.lower()
+    
+    proto_map = {
+        "hy2": "hysteria2",
+        "hysteria2": "hysteria2",
+        "vless": "vless",
+        "tuic": "tuic",
+        "socks5": "socks",
+        "socks": "socks"
+    }
+    out_type = proto_map.get(scheme)
+    if not out_type:
+        print(json.dumps({"error": "Hệ thống chỉ hỗ trợ: tuic, hy2, vless, socks5 hoặc ip:port:user:pass"}))
+        sys.exit(0)
+    
+    tag = ""
+    if parsed.fragment:
+        tag = urllib.parse.unquote(parsed.fragment)
+    else:
+        tag = f"node_{int(time.time())}"
+        
+    hostname = parsed.hostname
+    port = parsed.port or (1080 if out_type == "socks" else 443)
+    if not hostname:
+        print(json.dumps({"error": "Không thể xác định địa chỉ server từ dữ liệu nhập"}))
+        sys.exit(0)
+        
+    query = urllib.parse.parse_qs(parsed.query)
+    def get_q(key, default=""):
+        return query.get(key, [default])[0]
+
+    outbound = {
+        "type": out_type,
+        "tag": tag,
+        "server": hostname,
+        "server_port": int(port)
+    }
+
+    userinfo = urllib.parse.unquote(parsed.netloc.rsplit("@", 1)[0]) if "@" in parsed.netloc else ""
+    
+    if out_type == "hysteria2":
+        if userinfo:
+            outbound["password"] = userinfo
+        sni = get_q("sni") or get_q("peer") or hostname
+        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1" or get_q("allowinsecure") == "true"
+        outbound["tls"] = {
+            "enabled": True,
+            "server_name": sni,
+            "insecure": insecure
+        }
+        obfs = get_q("obfs")
+        obfs_password = get_q("obfs-password") or get_q("obfs_password")
+        if obfs:
+            outbound["obfs"] = {
+                "type": obfs,
+                "password": obfs_password
+            }
+            
+    elif out_type == "vless":
+        if userinfo:
+            outbound["uuid"] = userinfo
+        sni = get_q("sni") or get_q("peer") or hostname
+        security = get_q("security", "tls")
+        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1"
+        fp = get_q("fp") or "chrome"
+        
+        if security == "reality":
+            outbound["tls"] = {
+                "enabled": True,
+                "server_name": sni,
+                "utls": {
+                    "enabled": True,
+                    "fingerprint": fp
+                },
+                "reality": {
+                    "enabled": True,
+                    "public_key": get_q("pbk"),
+                    "short_id": get_q("sid")
+                }
+            }
+        elif security == "tls":
+            outbound["tls"] = {
+                "enabled": True,
+                "server_name": sni,
+                "insecure": insecure
+            }
+            if fp:
+                outbound["tls"]["utls"] = {
+                    "enabled": True,
+                    "fingerprint": fp
+                }
+            
+        flow = get_q("flow")
+        if flow:
+            outbound["flow"] = flow
+            
+        net_type = get_q("type", "tcp")
+        if net_type == "grpc":
+            service_name = get_q("serviceName") or get_q("servicename")
+            if service_name:
+                outbound["transport"] = {
+                    "type": "grpc",
+                    "service_name": service_name
+                }
+        elif net_type == "ws":
+            path = get_q("path") or "/"
+            outbound["transport"] = {
+                "type": "ws",
+                "path": path
+            }
+            
+    elif out_type == "tuic":
+        if ":" in userinfo:
+            uuid_val, pwd_val = userinfo.split(":", 1)
+            outbound["uuid"] = uuid_val
+            outbound["password"] = pwd_val
+        else:
+            outbound["uuid"] = userinfo
+            
+        sni = get_q("sni") or hostname
+        insecure = get_q("insecure") == "1" or get_q("allowInsecure") == "1" or get_q("allowinsecure") == "true"
+        congestion_control = get_q("congestion_control") or get_q("cc") or "bbr"
+        
+        outbound["tls"] = {
+            "enabled": True,
+            "server_name": sni,
+            "insecure": insecure,
+            "alpn": ["h3"]
+        }
+        outbound["congestion_control"] = congestion_control
+
+    elif out_type == "socks":
+        outbound["version"] = "5"
+        if userinfo:
+            if ":" in userinfo:
+                username_val, password_val = userinfo.split(":", 1)
+                outbound["username"] = username_val
+                outbound["password"] = password_val
+            else:
+                outbound["username"] = userinfo
+            
+    print(json.dumps(outbound))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+' "$input_data")
+
+    if echo "$outbound_json" | jq -e '.error' >/dev/null 2>&1; then
+        local err_msg
+        err_msg=$(echo "$outbound_json" | jq -r '.error')
+        echo -e "${RED}[LỖI] $err_msg${NC}"
+        read -p "Nhấn Enter để tiếp tục..."
+        return
+    fi
+
+    # Giữ nguyên tag cũ để tránh hỏng các routing rule đang sử dụng tag này
+    outbound_json=$(echo "$outbound_json" | jq --arg t "$old_tag" '.tag = $t')
+
+    jq --argjson i "$idx" --argjson new_node "$outbound_json" '.[$i] = $new_node' "$OUTBOUND_FILE" > "$OUTBOUND_FILE.tmp" && mv "$OUTBOUND_FILE.tmp" "$OUTBOUND_FILE"
+
+    log_success "Đã cập nhật outbound thành công bằng link mới (Tag giữ nguyên: $old_tag)!"
     
     if declare -f build_and_apply_config > /dev/null; then
         build_and_apply_config
