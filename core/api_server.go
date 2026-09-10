@@ -382,7 +382,7 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 				grpcurlPath = "grpcurl"
 			}
 
-			cmd := exec.Command(grpcurlPath, "-plaintext", "-import-path", "/tmp", "-proto", "/tmp/stats.proto", "-d", `{"pattern": "", "reset": false}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
+			cmd := exec.Command(grpcurlPath, "-plaintext", "-import-path", "/tmp", "-proto", "/tmp/stats.proto", "-d", `{"pattern": "", "reset": true}`, "127.0.0.1:10085", "v2ray.core.app.stats.command.StatsService/QueryStats")
 
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
