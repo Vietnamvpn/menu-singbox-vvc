@@ -247,23 +247,7 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 			continue
 		}
 
-		func() {
-			var taskResp TasksResponse
-			err := sendApiRequest("get_tasks", map[string]interface{}{}, &taskResp)
-			if err == nil && len(taskResp.Tasks) > 0 {
-				needReload := false
-				for _, task := range taskResp.Tasks {
-					changed := executeTask(task)
-					if changed {
-						needReload = true
-					}
-				}
-				if needReload {
-					go reloadSingbox()
-				}
-			}
-		}()
-
+		// 1. Thực hiện báo cáo lưu lượng (report_traffic) trước
 		func() {
 			// Thay thế map[string]interface{} bằng struct để ép buộc thứ tự key khi xuất ra JSON
 			type TrafficLog struct {
@@ -469,6 +453,24 @@ service StatsService { rpc QueryStats(QueryStatsRequest) returns (QueryStatsResp
 					}
 				} else {
 					log.Printf("[TRAFFIC REPORT] Không tìm thấy lưu lượng user nào trong dữ liệu từ grpcurl.")
+				}
+			}
+		}()
+
+		// 2. Thực hiện lấy nhiệm vụ (get_tasks) sau
+		func() {
+			var taskResp TasksResponse
+			err := sendApiRequest("get_tasks", map[string]interface{}{}, &taskResp)
+			if err == nil && len(taskResp.Tasks) > 0 {
+				needReload := false
+				for _, task := range taskResp.Tasks {
+					changed := executeTask(task)
+					if changed {
+						needReload = true
+					}
+				}
+				if needReload {
+					go reloadSingbox()
 				}
 			}
 		}()
